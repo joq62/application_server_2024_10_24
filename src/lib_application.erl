@@ -101,7 +101,7 @@ start_app(RepoDir,FileName)->
 		   {ok,Cwd}=file:get_cwd(),
 		   StartCmd=Cwd++"/"++PathStartFile,
 		   StartResult=os:cmd(StartCmd++" "++"daemon"),
-		   ?LOG_WARNING("StartResult",[FileName,StartResult]),
+		   ?LOG_WARNING("StartResult",StartResult),
 		   Sname=maps:get(sname,Info),
 		   {ok,Hostname}=net:gethostname(),
 		   AppVm=list_to_atom(Sname++"@"++Hostname),
