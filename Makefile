@@ -81,6 +81,7 @@ eunit:
 	erl -pa test_ebin\
 	 -pa _build/default/lib/log/ebin\
 	 -pa _build/default/lib/rd/ebin\
+	 -pa _build/default/lib/compiler_server/ebin\
 	 -pa _build/default/lib/git_handler/ebin\
 	 -pa _build/default/lib/application_server/ebin\
 	 -sname test_application_server\

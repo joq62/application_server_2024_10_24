@@ -65,8 +65,8 @@ load_app(RepoDir,FileName)->
 	       true->
 		   {error,["Already loaded ",FileName]};
 	       false ->
-		   ApplicationGitDir=maps:get(application_name,Info),
-		   file:del_dir_r(ApplicationGitDir),
+		   ApplicationDir=maps:get(application_name,Info),
+		   file:del_dir_r(ApplicationDir),
 		   AppTargetDir=maps:get(target_dir,Info),
 		   file:del_dir_r(AppTargetDir),		   
 		   Sname=maps:get(sname,Info),
@@ -74,16 +74,41 @@ load_app(RepoDir,FileName)->
 		   AppVm=list_to_atom(Sname++"@"++Hostname),
 		   rpc:call(AppVm,init,stop,[],3000),
 		   timer:sleep(2000),
-
+		   % Introduce check_stopped
+		   
 		   AppGitPath=maps:get(git,Info),
-		   os:cmd("git clone "++AppGitPath),
-		   ok=file:make_dir(AppTargetDir),
-		   TarSrc=maps:get(tar_src,Info),
-		   []=os:cmd("tar -zxf "++TarSrc++" -C "++AppTargetDir),
-		   file:del_dir_r(ApplicationGitDir),
+		   
+		   %os:cmd("git clone "++AppGitPath),
+		   %ok=file:make_dir(AppTargetDir),
+		   %TarSrc=maps:get(tar_src,Info),
+		   %[]=os:cmd("tar -zxf "++TarSrc++" -C "++AppTargetDir),
+		   %file:del_dir_r(ApplicationGitDir),
 
-		   true=filelib:is_file(StartFile),
-		   ok
+		   % New code
+		   case compiler_server:git_clone(AppGitPath,ApplicationDir) of
+		       {error,Reason}->
+			   {error,Reason};
+		       GitCloneR->
+			   case compiler_server:compile(ApplicationDir) of
+			       {error,Reason}->
+				   {error,Reason};
+			       {ok,CompileResult}->
+				    case compiler_server:release(ApplicationDir) of
+					{error,Reason}->
+					    {error,Reason};
+					{ok,ReleaseResult}->
+					    case filelib:is_file(StartFile) of
+						true->
+						    ok;
+						false->
+						    {error,["Failed to  compile an create a release",
+							    {gitclone,GitCloneR},
+							    {compile_result,CompileResult},
+							    {release_result,ReleaseResult}]}
+					    end
+				    end
+			   end
+		   end
 	   end,
     Result.
 %%--------------------------------------------------------------------

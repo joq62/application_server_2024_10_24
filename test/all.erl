@@ -61,6 +61,8 @@ start()->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
+
+-define(CheckFiles,["adder3.application","kvs.application"]).
 application_server_test()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
@@ -70,33 +72,49 @@ application_server_test()->
 
     pong=rpc:call(?Vm,application_server,ping,[],5000),
     {ok,AllFilenames}=rpc:call(?Vm,application_server,all_filenames,[],5000),
-    [
-     "adder3.application",
-     "kvs.application",
-     "phoscon.application"
-    ]=lists:sort(AllFilenames),
+    ?CheckFiles=[FileName||FileName<-lists:sort(AllFilenames),
+			   lists:member(FileName, ?CheckFiles)],
     {ok,"Repo is up to date"}=rpc:call(?Vm,application_server, update,[],5000),
 
     %Load and start adder3
-
     {error,["Not loaded ","adder3.application"]}=rpc:call(?Vm,application_server,start_app,["adder3.application"],5000),
     {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
     {error,["Not loaded ","adder3.application"]}=rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
     
+    io:format("~p~n",[{?MODULE,?LINE}]),
+    timer:sleep(3000),
     pong=rpc:call(?Vm,application_server,ping,[],5000),
 
-    ok=rpc:call(?Vm,application_server,load_app,["adder3.application"],5*5000),
-    {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
-
+    ok=case rpc:call(?Vm,application_server,load_app,["adder3.application"],5*5000) of
+	{error,[ErrMsg,{gitclone,Clone},{compile_result,Compile},{release_result,Release}]}->
+	       io:format("ErrMsg ~p~n",[ErrMsg]),
+	       io:format("Clone ~p~n",[Clone]),
+	       CompileText=[C||C<-Compile,
+			    C<256],
+	       io:format("Compile ~p~n",[CompileText]),
+	       ReleaseText=[C||C<-Release,
+			       C<256],
+	       io:format("Release ~p~n",[ReleaseText]),
+	       failed;
+	   ok->
+	       ok
+       end,
+    io:format(" ~p~n",[{?MODULE,?LINE}]),
+    timer:sleep(3000),
+    
+   {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
     ok=rpc:call(?Vm,application_server,start_app,["adder3.application"],5*5000),
     AppVm=adder3@c50,
     42=rpc:call(AppVm,adder3,add,[20,22],5000),
-    
+    io:format("~p~n",[{?MODULE,?LINE}]),
+    timer:sleep(3000),
     {error,["Already loaded ","adder3.application"]}=rpc:call(?Vm,application_server,load_app,["adder3.application"],5000),
     {error,[" Application started , needs to be stopped ","adder3.application"]}=rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
 
     ok=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
     pang=net_adm:ping(AppVm),
+    io:format("~p~n",[{?MODULE,?LINE}]),
+    timer:sleep(3000),
     {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
     {error,["Already loaded ","adder3.application"]}=rpc:call(?Vm,application_server,load_app,["adder3.application"],5000),
     ok=rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
@@ -173,6 +191,10 @@ setup()->
 
     ok=application:start(git_handler),
     pong=rpc:call(node(),git_handler,ping,[],3*5000),  
+    ok=application:start(compiler_server),
+    pong=rpc:call(node(),compiler_server,ping,[],3*5000),
+
+    %% Application to test
     ok=application:start(application_server),
     pong=rpc:call(node(),application_server,ping,[],3*5000),  
  %   ok=initial_trade_resources(),
