@@ -297,7 +297,7 @@ handle_call({start_app,Filename}, _From, State) ->
 
 handle_call({stop_app,Filename}, _From, State) ->
     RepoDir=State#state.repo_dir,
-    Result=try lib_application:stop_app(RepoDir,Filename) of
+    Result=try lib_application:stop_rel(RepoDir,Filename) of
 	      ok->
 		   ok;
 	       Error->
@@ -316,7 +316,7 @@ handle_call({stop_app,Filename}, _From, State) ->
 
 handle_call({unload_app,Filename}, _From, State) ->
     RepoDir=State#state.repo_dir,
-    Result=try lib_application:unload_app(RepoDir,Filename) of
+    Result=try lib_application:unload_rel(RepoDir,Filename) of
 	       ok->
 		   ok;
 	       Error->
@@ -335,7 +335,7 @@ handle_call({unload_app,Filename}, _From, State) ->
 
 handle_call({is_app_loaded,Filename}, _From, State) ->
     RepoDir=State#state.repo_dir,
-    Result=try lib_application:is_app_loaded(RepoDir,Filename) of
+    Result=try lib_application:is_rel_loaded(RepoDir,Filename) of
 	       true->
 		   true;
 	       false->
@@ -356,7 +356,7 @@ handle_call({is_app_loaded,Filename}, _From, State) ->
 
 handle_call({is_app_started,Filename}, _From, State) ->
     RepoDir=State#state.repo_dir,
-    Result=try lib_application:is_app_started(RepoDir,Filename) of
+    Result=try lib_application:is_rel_started(RepoDir,Filename) of
 	       true->
 		   true;
 	       false->
