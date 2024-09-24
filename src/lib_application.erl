@@ -22,128 +22,162 @@
 	]).
 
 -export([
-	 load_app/2,
-	 start_app/2,
-	 stop_app/2,
-	 unload_app/2,
-	 is_app_loaded/2,
-	 is_app_started/2
+	 load_rel/2,
+	 start_rel/2,
+	 stop_rel/2,
+	 unload_rel/2,
+	 is_rel_loaded/2,
+	 is_rel_started/2
 
 	]).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Data:
+%%   GitDir= git repo dir name where the files are cloned into.
+%%   Code ok:2024-09-17
+%% @end
+%%--------------------------------------------------------------------
+load_rel(CatalogDir,FileName)->
+    Result=case is_rel_loaded(CatalogDir,FileName) of
+	       true->
+		   {error,["Already loaded ",FileName]};
+	       false ->
+		   {ok,Cwd}=file:get_cwd(),
+		   case git_handler:read_file(CatalogDir,FileName) of
+		       {error,Reason}->
+			   {error,Reason};
+		       {ok,[Info]}->
+			   AppGitDir=maps:get(application_git_dir,Info),
+			   ApplicationDir=filename:join(Cwd,AppGitDir),
+			   file:del_dir_r(ApplicationDir),
+			   GitUrl=maps:get(giturl,Info),
+			   CloneResult=compiler_server:git_clone(GitUrl,ApplicationDir),
+			   ?LOG_NOTICE("CloneResult ",[CloneResult]),
+			   CompileResult=compiler_server:compile(ApplicationDir),
+			   ?LOG_NOTICE("CompileResult ",[CompileResult]),
+			   ReleaseResult=compiler_server:release(ApplicationDir),
+			   ?LOG_NOTICE("ReleaseResult ",[ReleaseResult]),
+			   case is_rel_loaded(CatalogDir,FileName) of
+			       true->
+				   ok;
+			       false->
+				   {error,["Failed to load rel "]}
+			   end
+		   end
+	   end,
+    Result.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% 
 %% @end
 %%--------------------------------------------------------------------
--define(TargetDir,"ctrl_dir").
--define(Vm,ctrl@c50).
--define(TarFile,"ctrl.tar.gz").
--define(App,"ctrl").
--define(TarSrc,"release"++"/"++?TarFile).
--define(StartCmd,"./"++?TargetDir++"/"++"bin"++"/"++?App).
-
-% #{id=>"adder3",
-%  application_name=>"adder3",
-%  vsn=>"0.1.0",
-%  app=>adder3, 
-%  erl_args=>" ",
-%  git=>"https://github.com/joq62/adder3.git",
-%  target_dir=>"adder3_dir",
-%  sname=>"adder3",
-%  tar_file=>"adder3.tar.gz",
-%  tar_src=>"adder3/release/adder3.tar.gz",
-%  start_cmd=>"./adder3_dir/bin/adder3"
-% }.
-load_app(RepoDir,FileName)->
-    {ok,[Info]}=git_handler:read_file(RepoDir,FileName), 
-    StartFile=maps:get(start_cmd,Info),
-    Result=case is_app_loaded(RepoDir,FileName) of
+start_rel(CatalogDir,FileName)->
+    
+    Result=case is_rel_started(CatalogDir,FileName) of
 	       true->
-		   {error,["Already loaded ",FileName]};
-	       false ->
-		   ApplicationDir=maps:get(application_name,Info),
-		   file:del_dir_r(ApplicationDir),
-		   AppTargetDir=maps:get(target_dir,Info),
-		   file:del_dir_r(AppTargetDir),		   
-		   Sname=maps:get(sname,Info),
-		   {ok,Hostname}=net:gethostname(),
-		   AppVm=list_to_atom(Sname++"@"++Hostname),
-		   rpc:call(AppVm,init,stop,[],3000),
-		   timer:sleep(2000),
-		   % Introduce check_stopped
-		   
-		   AppGitPath=maps:get(git,Info),
-		   
-		   %os:cmd("git clone "++AppGitPath),
-		   %ok=file:make_dir(AppTargetDir),
-		   %TarSrc=maps:get(tar_src,Info),
-		   %[]=os:cmd("tar -zxf "++TarSrc++" -C "++AppTargetDir),
-		   %file:del_dir_r(ApplicationGitDir),
-
-		   % New code
-		   case compiler_server:git_clone(AppGitPath,ApplicationDir) of
-		       {error,Reason}->
-			   {error,Reason};
-		       GitCloneR->
-			   case compiler_server:compile(ApplicationDir) of
-			       {error,Reason}->
-				   {error,Reason};
-			       {ok,CompileResult}->
-				    case compiler_server:release(ApplicationDir) of
-					{error,Reason}->
-					    {error,Reason};
-					{ok,ReleaseResult}->
-					    case filelib:is_file(StartFile) of
-						true->
-						    ok;
-						false->
-						    {error,["Failed to  compile an create a release",
-							    {gitclone,GitCloneR},
-							    {compile_result,CompileResult},
-							    {release_result,ReleaseResult}]}
-					    end
-				    end
+		   {error,["Already started ",FileName]};
+	       false->
+		   case is_rel_loaded(CatalogDir,FileName) of
+		       false->
+			   {error,["Application is not loaded ",FileName]};
+		       true ->
+			   {ok,[Info]}=git_handler:read_file(CatalogDir,FileName), 
+			   {ok,Cwd}=rpc:call(node(),file,get_cwd,[],5000),
+			   PathToExecFile=maps:get(path_to_exec_file,Info),
+			   ExecFile=maps:get(exec_file,Info),
+			   FullPathToExecFile=filename:join([Cwd,PathToExecFile,ExecFile]),
+			   case filelib:is_file(FullPathToExecFile) of
+			       false->
+				   {error,["No execfile in path ",ExecFile,FullPathToExecFile,FileName,CatalogDir]};
+			       true->
+				   case os:cmd(FullPathToExecFile++" "++"daemon") of
+				       []->
+					   Nodename=maps:get(nodename,Info),
+					   {ok,Hostname}=net:gethostname(),
+					   AppVm=list_to_atom(Nodename++"@"++Hostname),
+					   case check_started(AppVm) of
+					       false->
+						   {error,["Failed to start application Vm ",AppVm,ExecFile,FullPathToExecFile,FileName,CatalogDir]};
+				       true->
+						   App=maps:get(app,Info),
+						   case rpc:call(AppVm,App,ping,[],5000) of
+						       pong->
+							   ok;
+						       Err->
+							   {error,["Failed to start application ",AppVm,ExecFile,FullPathToExecFile,FileName,CatalogDir,Err]}
+						   end
+					   end;
+				       ErrorMsg->
+					   {error,["Failed to start application ",ExecFile,FullPathToExecFile,FileName,CatalogDir,ErrorMsg]}
+				   end
 			   end
 		   end
 	   end,
     Result.
 %%--------------------------------------------------------------------
 %% @doc
-%% 
+%% stop the vm
 %% @end
 %%--------------------------------------------------------------------
-start_app(RepoDir,FileName)->
-    Result=case is_app_loaded(RepoDir,FileName) of
+stop_rel(CatalogDir,FileName)->
+    Result=case is_rel_started(CatalogDir,FileName) of
+	       false->
+		   {error,["Not started ",FileName]};
+	       true ->
+		   {ok,[Info]}=git_handler:read_file(CatalogDir,FileName), 
+		   Nodename=maps:get(nodename,Info),
+		   {ok,Hostname}=net:gethostname(),
+		   AppVm=list_to_atom(Nodename++"@"++Hostname),
+		   App=maps:get(app,Info),
+		   rpc:call(AppVm,App,stop,[],3*5000),
+		   timer:sleep(5000),
+		   rpc:call(AppVm,init,stop,[],5000),
+		   case check_stopped(AppVm) of
+		       true->
+			   ok;
+		       false->
+			   {error,["Failed to stop application ",App,AppVm,CatalogDir,FileName]}
+		   end
+	   end,
+  Result.		   
+		   
+%%--------------------------------------------------------------------
+%% @doc
+%% Remove the git dir 
+%% @end
+%%--------------------------------------------------------------------
+unload_rel(CatalogDir,FileName)->
+     Result=case is_rel_loaded(CatalogDir,FileName) of
 	       false->
 		   {error,["Not loaded ",FileName]};
 	       true ->
-		   {ok,[Info]}=git_handler:read_file(RepoDir,FileName), 
-		   PathStartFile=maps:get(path_start_file,Info),
-		   {ok,Cwd}=file:get_cwd(),
-		   StartCmd=Cwd++"/"++PathStartFile,
-		   StartResult=os:cmd(StartCmd++" "++"daemon"),
-		   StartResultStr=unicode:characters_to_nfc_list(StartResult),
-		   ?LOG_WARNING("StartResultStr",[StartResultStr]),
-		   Sname=maps:get(sname,Info),
-		   {ok,Hostname}=net:gethostname(),
-		   AppVm=list_to_atom(Sname++"@"++Hostname),
-		   case check_started(AppVm) of
-		       true->
-			   case StartResult of
-			       []->
-				   ok;
-			       _->
-				   {error,["Started application with error code  ",FileName,StartResult]}
-			   end;
-		       false->
-			   {error,["Failed to start application ",FileName,StartResult]}
-		   end     
-	   end,
+		    case is_rel_started(CatalogDir,FileName) of
+			true->
+			    {error,[" Application started , needs to be stopped ",CatalogDir,FileName]};
+			false->
+			    {ok,Cwd}=file:get_cwd(),
+			    {ok,[Info]}=git_handler:read_file(CatalogDir,FileName), 
+			    AppGitDir=maps:get(application_git_dir,Info),
+			    ApplicationDir=filename:join(Cwd,AppGitDir),
+			    file:del_dir_r(ApplicationDir),
+			    case filelib:is_dir(ApplicationDir) of
+				false->
+				    ok;
+				true ->
+				    {error,["Failed to unload application ",CatalogDir,FileName]}
+			    end
+		    end
+	    end,
     Result.
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
 
 check_started(Node)->
     check_started(Node,?NumTries,?SleepInterval,false).    
@@ -163,27 +197,12 @@ check_started(Node)->
 	    Result=true
     end,
     check_started(Node,NewN,SleepInterval,Result). 
+
 %%--------------------------------------------------------------------
 %% @doc
 %% 
 %% @end
 %%--------------------------------------------------------------------
-stop_app(RepoDir,FileName)->
-    Result=case is_app_started(RepoDir,FileName) of
-	       false->
-		   {error,["Not started ",FileName]};
-	       true ->
-		   {ok,[Info]}=git_handler:read_file(RepoDir,FileName), 
-		   Sname=maps:get(sname,Info),
-		   {ok,Hostname}=net:gethostname(),
-		   AppVm=list_to_atom(Sname++"@"++Hostname),
-		   rpc:call(AppVm,init,stop,[],5000),
-		   true=check_stopped(AppVm),
-		   ok
-	   end,
-
-  Result.
-
 check_stopped(Node)->
     check_stopped(Node,?NumTries,?SleepInterval,false).    
 
@@ -203,35 +222,61 @@ check_stopped(Node)->
     end,
     check_stopped(Node,NewN,SleepInterval,Result).    
 	    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Dats: exec_file = Path to and filename to the executable file
+%% @end
+%%--------------------------------------------------------------------
+is_rel_loaded(CatalogDir,FileName)->
+    case filelib:is_dir(CatalogDir) of
+	false->
+	    false;
+	true->
+	    FullFileName=filename:join(CatalogDir,FileName),
+	    case file:consult(FullFileName) of
+		{error,_Reason}->
+		    false;
+		{ok,[ApplicationInfoMap]}-> 
+		    Path=maps:get(path_to_exec_file,ApplicationInfoMap),
+		    ExecFile=maps:get(exec_file,ApplicationInfoMap),
+		    filelib:is_file(filename:join(Path,ExecFile))
+	    end
+    end.
 %%--------------------------------------------------------------------
 %% @doc
 %% 
 %% @end
 %%--------------------------------------------------------------------
-unload_app(RepoDir,FileName)->
-     Result=case is_app_loaded(RepoDir,FileName) of
-	       false->
-		   {error,["Not loaded ",FileName]};
-	       true ->
-		    case is_app_started(RepoDir,FileName) of
-			true->
-			    {error,[" Application started , needs to be stopped ",FileName]};
-			false->
-			    {ok,[Info]}=git_handler:read_file(RepoDir,FileName), 
-			    ApplicationGitDir=maps:get(application_name,Info),
-			    file:del_dir_r(ApplicationGitDir),
-			    AppTargetDir=maps:get(target_dir,Info),
-			    file:del_dir_r(AppTargetDir),
-			    Sname=maps:get(sname,Info),
-			    {ok,Hostname}=net:gethostname(),
-			    AppVm=list_to_atom(Sname++"@"++Hostname),
-			    rpc:call(AppVm,init,stop,[],5000),
-			    timer:sleep(2000),
-			    pang=net_adm:ping(AppVm),
-			    ok
-		    end
-	    end,
-    Result.
+is_rel_started(CatalogDir,FileName)->
+    %% check if there is a Repordir 
+    IsStarted=case filelib:is_dir(CatalogDir) of
+		  false->
+		      false;
+		  true->
+		      case git_handler:read_file(CatalogDir,FileName) of
+			  {error,_Reason}->
+			      false;
+			  {ok,[Info]}->
+			      NodeName=maps:get(nodename,Info),
+			      {ok,Hostname}=net:gethostname(),
+			      AppVm=list_to_atom(NodeName++"@"++Hostname),
+			      case net_adm:ping(AppVm) of
+				  pang->
+				      false;
+				  pong->
+				      App=maps:get(app,Info),
+				      case rpc:call(AppVm,App,ping,[],5000) of
+					  pong->
+					      true;
+					  _->
+					      false
+				      end
+			      end
+		      end
+	      end,
+    IsStarted.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% 
@@ -239,7 +284,9 @@ unload_app(RepoDir,FileName)->
 %%--------------------------------------------------------------------
 is_app_loaded(RepoDir,FileName)->
     {ok,[Info]}=git_handler:read_file(RepoDir,FileName), 
-    StartFile=maps:get(start_cmd,Info),
+    Path=maps:get(path_to_exec_file,Info),
+    ExecFile=maps:get(exec_file,Info),
+    StartFile=filename:join(Path,ExecFile),
     filelib:is_file(StartFile).
 %%--------------------------------------------------------------------
 %% @doc
@@ -248,14 +295,20 @@ is_app_loaded(RepoDir,FileName)->
 %%--------------------------------------------------------------------
 is_app_started(RepoDir,FileName)->
     {ok,[Info]}=git_handler:read_file(RepoDir,FileName), 
-    Sname=maps:get(sname,Info),
+    Nodename=maps:get(nodename,Info),
     {ok,Hostname}=net:gethostname(),
-    AppVm=list_to_atom(Sname++"@"++Hostname),
+    AppVm=list_to_atom(Nodename++"@"++Hostname),
     IsStarted=case net_adm:ping(AppVm) of
 		  pang->
 		      false;
 		  pong->
-		      true
+		      App=maps:get(app,Info),
+		      case rpc:call(AppVm,App,ping,[],5000) of
+			  pong->
+			      true;
+			  _->
+			      false
+		      end
 	      end,
     IsStarted.
 

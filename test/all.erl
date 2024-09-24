@@ -13,18 +13,15 @@
  
 -export([start/0]).
 
--define(TargetDir,"ctrl_dir").
--define(Vm,node()).
--define(TarFile,"ctrl.tar.gz").
--define(App,"ctrl").
--define(TarSrc,"release"++"/"++?TarFile).
--define(StartCmd,"./"++?TargetDir++"/"++"bin"++"/"++?App).
 
 -define(LogFileToRead,"./logs/test_application_server/log.logs/test_logfile.1").
 
--define(AppVm,adder3@c50).
--define(AdderApp,adder3).
-
+%%%
+-define(AddTestVm,add_test@c50).
+-define(AddTestApp,add_test).
+-define(AddTestFileName,"add_test.application").
+-define(AddTestRepoDir,"add_test" ).
+-define(CatalogDir,"catalog_specs").
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
@@ -38,10 +35,7 @@ start()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME,?LINE}]),
     
     ok=setup(),
- %   ok=load_start_release(),
-  %  ok=host_server_test(),
-   % ok=deployment_server_test(),
-    ok=application_server_test(),    
+    ok=test1(), 
 
 
     timer:sleep(2000),
@@ -50,7 +44,7 @@ start()->
     L1=string:lexemes(LogStr,"\n"),
     [io:format("~p~n",[Str])||Str<-L1],
 
-    rpc:call(?Vm,init,stop,[],5000),
+    rpc:call(node(),init,stop,[],5000),
     timer:sleep(4000),
     init:stop(),
     ok.
@@ -61,116 +55,42 @@ start()->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-
--define(CheckFiles,["adder3.application","kvs.application"]).
-application_server_test()->
+test1()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    %% Clean up
+    lib_application:stop_rel(?CatalogDir,?AddTestFileName),
+    lib_application:unload_rel(?CatalogDir,?AddTestFileName),
 
-    %% Clean up before test 
-   rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
-   rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
-
-    pong=rpc:call(?Vm,application_server,ping,[],5000),
-    {ok,AllFilenames}=rpc:call(?Vm,application_server,all_filenames,[],5000),
-    ?CheckFiles=[FileName||FileName<-lists:sort(AllFilenames),
-			   lists:member(FileName, ?CheckFiles)],
-    {ok,"Repo is up to date"}=rpc:call(?Vm,application_server, update,[],5000),
-
-    %Load and start adder3
-    {error,["Not loaded ","adder3.application"]}=rpc:call(?Vm,application_server,start_app,["adder3.application"],5000),
-    {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
-    {error,["Not loaded ","adder3.application"]}=rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
+    %% load_rel test
+    {error,["Application is not loaded ","add_test.application"]}=lib_application:start_rel(?CatalogDir,?AddTestFileName),
+    {error,["Not started ","add_test.application"]}=lib_application:stop_rel(?CatalogDir,?AddTestFileName),
+    {error,["Not loaded ","add_test.application"]}=lib_application:unload_rel(?CatalogDir,?AddTestFileName),
+    ok=lib_application:load_rel(?CatalogDir,?AddTestFileName),
+    %% start_rel test
+    {error,["Already loaded ","add_test.application"]}=lib_application:load_rel(?CatalogDir,?AddTestFileName),
+    {error,["Not started ","add_test.application"]}=lib_application:stop_rel(?CatalogDir,?AddTestFileName),
+     ok=lib_application:start_rel(?CatalogDir,?AddTestFileName),
+    ApplicationSpecFile=filename:join(?CatalogDir,?AddTestFileName),
+    {ok,[Info]}=file:consult(ApplicationSpecFile), 
+    Nodename=maps:get(nodename,Info),
+    {ok,Hostname}=net:gethostname(),
+    AppVm=list_to_atom(Nodename++"@"++Hostname),
+    App=maps:get(app,Info),
+    42=rpc:call(AppVm,App,add,[20,22],3*5000),
+    %% stop_rel test 
+    {error,["Already loaded ","add_test.application"]}=lib_application:load_rel(?CatalogDir,?AddTestFileName),
+    {error,[" Application started , needs to be stopped ","catalog_specs","add_test.application"]}=lib_application:unload_rel(?CatalogDir,?AddTestFileName),    
+    {error,["Already started ","add_test.application"]}=lib_application:start_rel(?CatalogDir,?AddTestFileName),
+    ok=lib_application:stop_rel(?CatalogDir,?AddTestFileName),
+    {badrpc,nodedown}=rpc:call(AppVm,App,add,[20,22],3*5000),
+    %% unload_rel 
+    {error,["Already loaded ","add_test.application"]}=lib_application:load_rel(?CatalogDir,?AddTestFileName),
+    {error,["Not started ","add_test.application"]}=lib_application:stop_rel(?CatalogDir,?AddTestFileName),
+    ok=lib_application:unload_rel(?CatalogDir,?AddTestFileName),  
     
-    io:format("~p~n",[{?MODULE,?LINE}]),
-    timer:sleep(3000),
-    pong=rpc:call(?Vm,application_server,ping,[],5000),
-
-    ok=case rpc:call(?Vm,application_server,load_app,["adder3.application"],5*5000) of
-	{error,[ErrMsg,{gitclone,Clone},{compile_result,Compile},{release_result,Release}]}->
-	       io:format("ErrMsg ~p~n",[ErrMsg]),
-	       io:format("Clone ~p~n",[Clone]),
-	       CompileText=[C||C<-Compile,
-			    C<256],
-	       io:format("Compile ~p~n",[CompileText]),
-	       ReleaseText=[C||C<-Release,
-			       C<256],
-	       io:format("Release ~p~n",[ReleaseText]),
-	       failed;
-	   ok->
-	       ok
-       end,
-    io:format(" ~p~n",[{?MODULE,?LINE}]),
-    timer:sleep(3000),
-    
-   {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
-    ok=rpc:call(?Vm,application_server,start_app,["adder3.application"],5*5000),
-    AppVm=adder3@c50,
-    42=rpc:call(AppVm,adder3,add,[20,22],5000),
-    io:format("~p~n",[{?MODULE,?LINE}]),
-    timer:sleep(3000),
-    {error,["Already loaded ","adder3.application"]}=rpc:call(?Vm,application_server,load_app,["adder3.application"],5000),
-    {error,[" Application started , needs to be stopped ","adder3.application"]}=rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
-
-    ok=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
-    pang=net_adm:ping(AppVm),
-    io:format("~p~n",[{?MODULE,?LINE}]),
-    timer:sleep(3000),
-    {error,["Not started ","adder3.application"]}=rpc:call(?Vm,application_server,stop_app,["adder3.application"],5000),
-    {error,["Already loaded ","adder3.application"]}=rpc:call(?Vm,application_server,load_app,["adder3.application"],5000),
-    ok=rpc:call(?Vm,application_server,unload_app,["adder3.application"],5000),
     
     ok.
-%% --------------------------------------------------------------------
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
-deployment_server_test()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    pong=rpc:call(?Vm,deployment_server,ping,[],5000),
-    {ok,AllFilenames}=rpc:call(?Vm,deployment_server,all_filenames,[],5000),
-    [
-     "adder3.deployment",
-      "kvs.deployment",
-      "log2.deployment",
-      "log2.deployment~",
-      "phoscon_zigbee.deployment"
-    ]=lists:sort(AllFilenames),
-   
-    [
-     {"adder3.application","c50"},
-     {"kvs.application","c50"},
-     {"phoscon.application","c50"}
-    ]=lists:sort(rpc:call(?Vm,deployment_server, get_applications_to_deploy,[],5000)),
-   
-    {ok,"Repo is up to date"}=rpc:call(?Vm,deployment_server, update,[],5000),
-  
-    ok.
 
-%% --------------------------------------------------------------------
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
-host_server_test()->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    pong=rpc:call(?Vm,host_server,ping,[],5000),
-   {ok,AllFilenames}=rpc:call(?Vm,host_server,all_filenames,[],5000),
-    ["c200.host","c201.host","c202.host","c230.host","c50.host"]=lists:sort(AllFilenames),
-    ['ctrl@c200','ctrl@c201','ctrl@c202','ctrl@c230','ctrl@c50']=lists:sort(rpc:call(?Vm,host_server, get_host_nodes,[],5000)),
-    
-    [
-     {app1,[{value1,v11},{value2,12}]},
-     {app2,[{value1,v21},{value2,22}]},
-     {conbee,[{conbee_addr,"172.17.0.2"},
-	      {conbee_port,80},
-	      {conbee_key,"Glurk"}]}
-    ]=rpc:call(?Vm,host_server,get_application_config,[],5000),
-
-   
-    {ok,"Repo is up to date"}=rpc:call(?Vm,host_server, update,[],5000),
-  
-    ok.
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
@@ -189,10 +109,10 @@ setup()->
 
     ok=application:start(rd),
 
+    ok=application:start(compiler_server),
+    pong=rpc:call(node(),compiler_server,ping,[],3*5000),  
     ok=application:start(git_handler),
     pong=rpc:call(node(),git_handler,ping,[],3*5000),  
-    ok=application:start(compiler_server),
-    pong=rpc:call(node(),compiler_server,ping,[],3*5000),
 
     %% Application to test
     ok=application:start(application_server),

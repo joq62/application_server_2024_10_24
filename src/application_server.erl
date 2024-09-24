@@ -23,6 +23,7 @@
 %% API
 
 -export([
+	 
 	 load_app/1,
 	 start_app/1,
 	 stop_app/1,
@@ -256,7 +257,8 @@ init([]) ->
 
 handle_call({load_app,Filename}, _From, State) ->
     RepoDir=State#state.repo_dir,
-    Result=try lib_application:load_app(RepoDir,Filename) of
+    Result=try lib_application:load_rel(RepoDir,Filename) of
+ %   Result=try lib_application:load_app(RepoDir,Filename) of
 	       ok->
 		   ok;
 	       Error->
@@ -275,7 +277,8 @@ handle_call({load_app,Filename}, _From, State) ->
 
 handle_call({start_app,Filename}, _From, State) ->
     RepoDir=State#state.repo_dir,
-    Result=try lib_application:start_app(RepoDir,Filename) of
+    Result=try lib_application:start_rel(RepoDir,Filename) of
+ %   Result=try lib_application:start_app(RepoDir,Filename) of
 	       ok->
 		   ok;
 	       Error->
