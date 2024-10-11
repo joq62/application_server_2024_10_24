@@ -1,21 +1,20 @@
 #{filename=>"add_test.application",
-  application_info=>#{
+  %% application_info
     	application_name=>"add_test", % used for ?
   	vsn=>"0.1.0",			%  used fore ?
   	app=>add_test, 		% ping
   	giturl=>"https://github.com/joq62/add_test.git",
   	build_dir=>"_build",
   	libs=>"_build/default/lib",
-	apps_to_start=>[log,rd,add_test]
-	},
-  deployment_info=>#{
-	host=>"c50"
-		},
-  deployment_status=>#{
+	apps_to_start=>[log,rd,add_test],
+  %% deployment_info
+	host=>"c50",
+	
+  % deployment_status
 	application_dir=>undefined,
 	nodename=>undefined,
 	node=>undefined,
 	status=>not_deployed,
 	created=>undefined
-	}
+	
 }.

@@ -61,25 +61,22 @@ start(SpecFile,ApplicationMaps)->
 		    {error,["Not loaded",SpecFile]};
 		true->
 		    % case is_started(SpecFile,ApplicationMaps) of
-		    ApplicationInfoMap=maps:get(application_info,Map),
-		    DeploymentStatusMap=maps:get(deployment_status,Map),
-
+		  
 		 %% Add paths
-		    Libs=maps:get(libs,ApplicationInfoMap), 
-		    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
-		    Node=maps:get(node,DeploymentStatusMap),
+		    Libs=maps:get(libs,Map), 
+		    ApplicationDir=maps:get(application_dir,Map),
+		    Node=maps:get(node,Map),
 		    ApplLibs=filename:join(ApplicationDir,Libs),
 		    {ok,Applications}=file:list_dir(ApplLibs),
 		    ApplicationList=[filename:join(ApplLibs,Application)||Application<-Applications],
 		    ok=add_path(ApplicationList,Node),
 		    %% Start applications
-		    ApplicationsToStart=maps:get(apps_to_start,ApplicationInfoMap), 
+		    ApplicationsToStart=maps:get(apps_to_start,Map), 
 		    StartResult=[{App,rpc:call(Node,application,start,[App],5000)}||App<-ApplicationsToStart],
 		    case [{App,R}||{App,R}<-StartResult,ok=/=R] of
 			[]->
-			    DeploymentStatusMap1=maps:update(status,started,DeploymentStatusMap),
-			    Map2=maps:update(deployment_status,DeploymentStatusMap1,Map),
-			    {ok,[Map2|lists:delete(Map,ApplicationMaps)]};
+			    Map1=maps:update(status,started,Map),
+			    {ok,[Map1|lists:delete(Map,ApplicationMaps)]};
 			Error->
 			    {error,["Failed to start ",SpecFile,Error]}
 		    end
@@ -117,12 +114,9 @@ load(SpecFile,ApplicationMaps)->
 		true->
 		    {error,["Allready loaded",SpecFile]};
 		false->
-		    ApplicationInfoMap=maps:get(application_info,Map),
-		    DeploymentStatusMap=maps:get(deployment_status,Map),
-		    
-		    %%Clone
-		    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
-		    GitUrl=maps:get(giturl,ApplicationInfoMap),    
+		     %%Clone
+		    ApplicationDir=maps:get(application_dir,Map),
+		    GitUrl=maps:get(giturl,Map),    
 		    os:cmd("git clone "++GitUrl++" "++ApplicationDir),
 		    %%Compile
 		    {ok,Root}=file:get_cwd(),
@@ -133,9 +127,8 @@ load(SpecFile,ApplicationMaps)->
 			false->
 			    {error,["Failed to compile",SpecFile]};
 			true ->
-			    DeploymentStatusMap1=maps:update(status,loaded,DeploymentStatusMap),
-			    Map2=maps:update(deployment_status,DeploymentStatusMap1,Map),
-			    {ok,[Map2|lists:delete(Map,ApplicationMaps)]}
+			    Map1=maps:update(status,loaded,Map),
+			    {ok,[Map1|lists:delete(Map,ApplicationMaps)]}
 		    end
 	    end
     end.
@@ -155,18 +148,15 @@ unload(SpecFile,ApplicationMaps)->
 		false->
 		    {error,["Not loaded",SpecFile]};
 		true->
-		    ApplicationInfoMap=maps:get(application_info,Map),
-		    DeploymentStatusMap=maps:get(deployment_status,Map),
-		    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
+		    ApplicationDir=maps:get(application_dir,Map),
 		    {ok,Files}=file:list_dir(ApplicationDir),
 		    [file:del_dir_r(filename:join(ApplicationDir,File))||File<-Files],
 		    case is_loaded(Map) of
 			true->
 			    {error,["Failed to unload",SpecFile]};
 			false ->
-			    DeploymentStatusMap1=maps:update(status,unloaded,DeploymentStatusMap),
-			    Map2=maps:update(deployment_status,DeploymentStatusMap1,Map),
-			    {ok,[Map2|lists:delete(Map,ApplicationMaps)]}
+			    Map1=maps:update(status,unloaded,Map),
+			    {ok,[Map1|lists:delete(Map,ApplicationMaps)]}
 		    end
 	    end
     end.
@@ -179,10 +169,8 @@ unload(SpecFile,ApplicationMaps)->
 %% @end
 %%--------------------------------------------------------------------
 is_loaded(Map)->
-    ApplicationInfoMap=maps:get(application_info,Map),
-    Buildir=maps:get(build_dir,ApplicationInfoMap),
-    DeploymentStatusMap=maps:get(deployment_status,Map),
-    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
+    Buildir=maps:get(build_dir,Map),
+    ApplicationDir=maps:get(application_dir,Map),
     BuilDirPath=filename:join(ApplicationDir,Buildir),
     filelib:is_dir(BuilDirPath).
 	    
@@ -199,14 +187,11 @@ start_node(SpecFile,ApplicationMaps)->
 		   {error,["Allready started"]};
 	       false->
 		   {ok,[Map]}=file:consult(SpecFile),
-		   ApplicationInfoMap=maps:get(application_info,Map),
-		   DeploymentInfoMap=maps:get(deployment_info,Map),
-		   DeploymentStatusMap=maps:get(deployment_status,Map),
 		   {ok,Host}=net:gethostname(),
 		   %% Create dir
 		   UniqueNum=integer_to_list(os:system_time(millisecond),36),
-		   ApplName=maps:get(application_name,ApplicationInfoMap),
-		   Vsn=maps:get(vsn,ApplicationInfoMap), 
+		   ApplName=maps:get(application_name,Map),
+		   Vsn=maps:get(vsn,Map), 
 		   [Major,Minor,Patch]=string:lexemes(Vsn,"."),
 		   ApplicationDir=UniqueNum++"_"++ApplName++"_"++Major++Minor++Patch++"_"++?DirExt,
 		   ok=file:make_dir(ApplicationDir),
@@ -215,13 +200,12 @@ start_node(SpecFile,ApplicationMaps)->
 		   CookieStr=atom_to_list(erlang:get_cookie()),
 		   {ok,Node}=slave:start(Host,NodeName," -setcookie "++CookieStr),
 		   pong=net_adm:ping(Node),
-		   DeploymentStatusMap0=maps:update(application_dir,ApplicationDir,DeploymentStatusMap),
-		   DeploymentStatusMap1=maps:update(nodename,NodeName,DeploymentStatusMap0),
-		   DeploymentStatusMap2=maps:update(node,Node,DeploymentStatusMap1),
-		   DeploymentStatusMap3=maps:update(status,node_started,DeploymentStatusMap2),
-		   DeploymentStatusMap4=maps:update(created,{date(),time()},DeploymentStatusMap3),
-		   Map2=maps:update(deployment_status,DeploymentStatusMap4,Map),
-		   {ok,Node,[Map2|ApplicationMaps]}
+		   Map0=maps:update(application_dir,ApplicationDir,Map),
+		   Map1=maps:update(nodename,NodeName,Map0),
+		   Map2=maps:update(node,Node,Map1),
+		   Map3=maps:update(status,node_started,Map2),
+		   Map4=maps:update(created,{date(),time()},Map3),
+		   {ok,Node,[Map4|ApplicationMaps]}
 	   end,
     Result.
     
@@ -241,13 +225,9 @@ stop_node(SpecFile,ApplicationMaps)->
 		       undefined->
 			   {error,["Undefined"]};
 		       {ok,Map}->
-			   ApplicationInfoMap=maps:get(application_info,Map),
-			   DeploymentInfoMap=maps:get(deployment_info,Map),
-			   DeploymentStatusMap=maps:get(deployment_status,Map),
-
-			   Node=maps:get(node,DeploymentStatusMap),
+			   Node=maps:get(node,Map),
 			   slave:stop(Node),
-			   ApplicationDir=maps:get(application_dir,DeploymentStatusMap), 
+			   ApplicationDir=maps:get(application_dir,Map), 
 			   file:del_dir_r(ApplicationDir),
 			   {ok,lists:delete(Map,ApplicationMaps)}
 		   end
@@ -488,9 +468,9 @@ is_rel_loaded(CatalogDir,FileName)->
 	    case file:consult(FullFileName) of
 		{error,_Reason}->
 		    false;
-		{ok,[ApplicationInfoMap]}-> 
-		    Path=maps:get(path_to_exec_file,ApplicationInfoMap),
-		    ExecFile=maps:get(exec_file,ApplicationInfoMap),
+		{ok,[Map]}-> 
+		    Path=maps:get(path_to_exec_file,Map),
+		    ExecFile=maps:get(exec_file,Map),
 		    filelib:is_file(filename:join(Path,ExecFile))
 	    end
     end.
