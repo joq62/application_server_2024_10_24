@@ -66,7 +66,7 @@ start()->
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-
+    os:cmd("rm -rf Mnesia.*"),
     ok=application:start(log),
     file:make_dir(?MainLogDir),
     [NodeName,_HostName]=string:tokens(atom_to_list(node()),"@"),
@@ -78,5 +78,6 @@ setup()->
     %% Application to test
     ok=application:start(application_server),
     pong=rpc:call(node(),application_server,ping,[],3*5000),  
-
+    
+    
     ok.

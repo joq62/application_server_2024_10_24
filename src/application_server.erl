@@ -23,9 +23,13 @@
 %% API
 
 -export([
-	
+	 load_start/1,
+	 stop_unload/1,
+
 	 get_wanted_applications/0,
-	 get_active_applications/0
+	 get_active_applications/0,
+	 applications_to_start/0,
+	 applications_to_stop/0
 	 
 	]).
 
@@ -67,7 +71,48 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec load_start(Filename :: string()) -> 
+	  {ok,Node::node()} | {error,Reason::term()}.
+load_start(Filename) ->
+    gen_server:call(?SERVER,{load_start,Filename},infinity).
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec stop_unload(Filename :: string()) -> 
+	  ok | {error,Reason::term()}.
+stop_unload(Filename) ->
+    gen_server:call(?SERVER,{stop_unload,Filename},infinity).
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%%  
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec applications_to_start() -> 
+	  {ok,ListOfApplicationSpecs::term()} | {error,Reason::term()}.
+applications_to_start()  ->
+    gen_server:call(?SERVER,{applications_to_start},infinity).
+%%--------------------------------------------------------------------
+%% @doc
+%%  
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec applications_to_stop() -> 
+	  {ok,ListOfApplicationSpecs::term()} | {error,Reason::term()}.
+applications_to_stop()  ->
+    gen_server:call(?SERVER,{applications_to_stop},infinity).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -244,6 +289,46 @@ init([]) ->
 	  {noreply, NewState :: term(), hibernate} |
 	  {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
 	  {stop, Reason :: term(), NewState :: term()}.
+
+
+handle_call({load_start,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:load_start(SpecFile,State#state.application_maps) of
+	      {ok,Node,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  {ok,Node};
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
+
+handle_call({stop_unload,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:stop_unload(SpecFile,State#state.application_maps) of
+	      {stopped,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  ok;
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
+
+
+handle_call({applications_to_start}, _From, State) ->
+    {ok,WantedApplicationFiles}=lib_application:get_wanted_applications(State#state.specs_dir),
+    {ok,ActiveApplicationFiles}=lib_application:get_active_applications(State#state.application_maps),
+     Reply=[File||File<-WantedApplicationFiles,
+			false=:=lists:member(File,ActiveApplicationFiles)],
+    {reply, Reply,State};
+
+handle_call({applications_to_stop}, _From, State) ->
+    {ok,WantedApplicationFiles}=lib_application:get_wanted_applications(State#state.specs_dir),
+    {ok,ActiveApplicationFiles}=lib_application:get_active_applications(State#state.application_maps),
+     Reply=[File||File<-ActiveApplicationFiles,
+			false=:=lists:member(File,WantedApplicationFiles)],
+    {reply, Reply,State};
 
 handle_call({get_wanted_applications}, _From, State) ->
     Reply=case lib_application:get_wanted_applications(State#state.specs_dir) of
