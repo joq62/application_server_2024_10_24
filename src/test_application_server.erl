@@ -34,11 +34,12 @@
 start()->
      io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     {ok,Node}=test_start_node(),
+    ok=test_load(),
+    ok=test_start(Node),
+    ok=test_unload(),
     ok=test_stop_node(Node),
-    ok=kvs_testing(),
 
     ok.
-
 %%--------------------------------------------------------------------
 %% @doc
 %% 
@@ -60,10 +61,77 @@ test_start_node()->
 %% 
 %% @end
 %%--------------------------------------------------------------------
+test_load()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+   
+    ok=application_server:load(?AddTestFileName),
+    {error,["Allready loaded","catalog_specs/add_test.application"]}=application_server:load(?AddTestFileName),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+test_start(Node)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+   
+    ok=application_server:start(?AddTestFileName),
+    pong=rpc:call(Node,log,ping,[],5000),
+    pong=rpc:call(Node,rd,ping,[],5000),
+    pong=rpc:call(Node,add_test,ping,[],5000),
+    42=rpc:call(Node,add_test,add,[20,22],5000),
+    {error,["Failed to start ","catalog_specs/add_test.application",
+	    [{log,{error,{already_started,log}}},
+	     {rd,{error,{already_started,rd}}},
+	     {add_test,{error,{already_started,add_test}}}
+	    ]
+	   ]
+    }=application_server:start(?AddTestFileName),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+test_stop(Node)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+   
+    ok=application_server:start(?AddTestFileName),
+    pong=rpc:call(Node,log,ping,[],5000),
+    pong=rpc:call(Node,rd,ping,[],5000),
+    pong=rpc:call(Node,add_test,ping,[],5000),
+    42=rpc:call(Node,add_test,add,[20,22],5000),
+    {error,["Failed to start ","catalog_specs/add_test.application",
+	    [{log,{error,{already_started,log}}},
+	     {rd,{error,{already_started,rd}}},
+	     {add_test,{error,{already_started,add_test}}}
+	    ]
+	   ]
+    }=application_server:start(?AddTestFileName),
+    ok.
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+test_unload()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+   
+    ok=application_server:unload(?AddTestFileName),
+    {error,["Not loaded","catalog_specs/add_test.application"]}=application_server:unload(?AddTestFileName),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
 test_stop_node(Node)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-     
-    ok=application_server:stop_node(?AddTestFileName),
+     ok=application_server:stop_node(?AddTestFileName),
     {error,["Not started"]}=application_server:stop_node(?AddTestFileName),
     pang=net_adm:ping(Node),
     

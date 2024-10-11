@@ -92,10 +92,23 @@ stop_node(Filename) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
--spec load(ApplicationMap::map()) -> 
-	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
-load(ApplicationMap) ->
-    gen_server:call(?SERVER,{load,ApplicationMap},infinity).
+-spec load(Filename :: string()) -> 
+	  ok | {error,Reason::term()}.
+load(Filename) ->
+    gen_server:call(?SERVER,{load,Filename},infinity).
+
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%%  
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec unload(Filename :: string()) -> 
+	  ok | {error,Reason::term()}.
+unload(Filename) ->
+    gen_server:call(?SERVER,{unload,Filename},infinity).
 
 
 %%--------------------------------------------------------------------
@@ -105,11 +118,10 @@ load(ApplicationMap) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
--spec start(ApplicationMap::map()) -> 
-	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
-start(ApplicationMap) ->
-    gen_server:call(?SERVER,{start,ApplicationMap},infinity).
-
+-spec start(Filename :: string()) -> 
+	  ok | {error,Reason::term()}.
+start(Filename) ->
+    gen_server:call(?SERVER,{start,Filename},infinity).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -118,24 +130,10 @@ start(ApplicationMap) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
--spec stop(ApplicationMap::map()) -> 
-	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
-stop(ApplicationMap) ->
-    gen_server:call(?SERVER,{stop,ApplicationMap},infinity).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Based on info Application file git clone the repo and 
-%% extract the tar file  
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec unload(ApplicationMap::map()) -> 
-	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
-unload(ApplicationMap) ->
-    gen_server:call(?SERVER,{unload,ApplicationMap},infinity).
-
+-spec stop(Filename :: string()) -> 
+	  ok | {error,Reason::term()}.
+stop(Filename) ->
+    gen_server:call(?SERVER,{stop,Filename},infinity).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -229,6 +227,42 @@ handle_call({start_node,Filename}, _From, State) ->
 handle_call({stop_node,Filename}, _From, State) ->
     SpecFile=filename:join(State#state.specs_dir,Filename),
     Reply=case lib_application:stop_node(SpecFile,State#state.application_maps) of
+	      {ok,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  ok;
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
+
+handle_call({load,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:load(SpecFile,State#state.application_maps) of
+	      {ok,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  ok;
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
+
+handle_call({start,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:start(SpecFile,State#state.application_maps) of
+	      {ok,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  ok;
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
+
+handle_call({unload,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:unload(SpecFile,State#state.application_maps) of
 	      {ok,NewApplcationMaps}->
 		  NewState=State#state{application_maps=NewApplcationMaps},
 		  ok;

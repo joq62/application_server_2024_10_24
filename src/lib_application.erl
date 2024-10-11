@@ -18,7 +18,11 @@
 
 -export([
 	 start_node/2,
-	 stop_node/2
+	 stop_node/2,
+	 load/2,
+	 unload/2,
+	 start/2
+%	 stop/2
 	]).
 
 -export([
@@ -40,6 +44,148 @@
 
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+start(SpecFile,ApplicationMaps)->
+    case get_application_map(SpecFile,ApplicationMaps) of
+	undefined->
+	    {error,["Node not started"]};
+	{ok,Map}->
+	    case is_loaded(Map) of
+		false->
+		    {error,["Not loaded",SpecFile]};
+		true->
+		    % case is_started(SpecFile,ApplicationMaps) of
+		    ApplicationInfoMap=maps:get(application_info,Map),
+		    DeploymentStatusMap=maps:get(deployment_status,Map),
+
+		 %% Add paths
+		    Libs=maps:get(libs,ApplicationInfoMap), 
+		    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
+		    Node=maps:get(node,DeploymentStatusMap),
+		    ApplLibs=filename:join(ApplicationDir,Libs),
+		    {ok,Applications}=file:list_dir(ApplLibs),
+		    ApplicationList=[filename:join(ApplLibs,Application)||Application<-Applications],
+		    ok=add_path(ApplicationList,Node),
+		    %% Start applications
+		    ApplicationsToStart=maps:get(apps_to_start,ApplicationInfoMap), 
+		    StartResult=[{App,rpc:call(Node,application,start,[App],5000)}||App<-ApplicationsToStart],
+		    case [{App,R}||{App,R}<-StartResult,ok=/=R] of
+			[]->
+			    DeploymentStatusMap1=maps:update(status,started,DeploymentStatusMap),
+			    Map2=maps:update(deployment_status,DeploymentStatusMap1,Map),
+			    {ok,[Map2|lists:delete(Map,ApplicationMaps)]};
+			Error->
+			    {error,["Failed to start ",SpecFile,Error]}
+		    end
+	    end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+add_path([],Vm)->
+    ok;
+add_path([ApplicationRoot|T],Vm)->
+    {ok,SubDirs}=file:list_dir(ApplicationRoot),
+    SubDirsPaths=[filename:join(ApplicationRoot,SubDir)||SubDir<-SubDirs],
+    rpc:call(Vm,code,add_paths,[SubDirsPaths],5000),
+    add_path(T,Vm).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+load(SpecFile,ApplicationMaps)->
+    case get_application_map(SpecFile,ApplicationMaps) of
+	undefined->
+	    {error,["Node not started"]};
+	{ok,Map}->
+	    case is_loaded(Map) of
+		true->
+		    {error,["Allready loaded",SpecFile]};
+		false->
+		    ApplicationInfoMap=maps:get(application_info,Map),
+		    DeploymentStatusMap=maps:get(deployment_status,Map),
+		    
+		    %%Clone
+		    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
+		    GitUrl=maps:get(giturl,ApplicationInfoMap),    
+		    os:cmd("git clone "++GitUrl++" "++ApplicationDir),
+		    %%Compile
+		    {ok,Root}=file:get_cwd(),
+		    ok=file:set_cwd(ApplicationDir),
+		    os:cmd("rebar3 compile"),  
+		    ok=file:set_cwd(Root),
+		    case is_loaded(Map) of
+			false->
+			    {error,["Failed to compile",SpecFile]};
+			true ->
+			    DeploymentStatusMap1=maps:update(status,loaded,DeploymentStatusMap),
+			    Map2=maps:update(deployment_status,DeploymentStatusMap1,Map),
+			    {ok,[Map2|lists:delete(Map,ApplicationMaps)]}
+		    end
+	    end
+    end.
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+unload(SpecFile,ApplicationMaps)->
+    case get_application_map(SpecFile,ApplicationMaps) of
+	undefined->
+	    {error,["Node not started"]};
+	{ok,Map}->
+	    case is_loaded(Map) of
+		false->
+		    {error,["Not loaded",SpecFile]};
+		true->
+		    ApplicationInfoMap=maps:get(application_info,Map),
+		    DeploymentStatusMap=maps:get(deployment_status,Map),
+		    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
+		    {ok,Files}=file:list_dir(ApplicationDir),
+		    [file:del_dir_r(filename:join(ApplicationDir,File))||File<-Files],
+		    case is_loaded(Map) of
+			true->
+			    {error,["Failed to unload",SpecFile]};
+			false ->
+			    DeploymentStatusMap1=maps:update(status,unloaded,DeploymentStatusMap),
+			    Map2=maps:update(deployment_status,DeploymentStatusMap1,Map),
+			    {ok,[Map2|lists:delete(Map,ApplicationMaps)]}
+		    end
+	    end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+is_loaded(Map)->
+    ApplicationInfoMap=maps:get(application_info,Map),
+    Buildir=maps:get(build_dir,ApplicationInfoMap),
+    DeploymentStatusMap=maps:get(deployment_status,Map),
+    ApplicationDir=maps:get(application_dir,DeploymentStatusMap),
+    BuilDirPath=filename:join(ApplicationDir,Buildir),
+    filelib:is_dir(BuilDirPath).
+	    
 %%--------------------------------------------------------------------
 %% @doc
 %% 
