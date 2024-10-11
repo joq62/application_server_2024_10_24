@@ -7,7 +7,7 @@ all:
 	#INFO: Deleting euinit test applications dirs
 	rm -rf *_container;
 	rm -rf logs;
-	rm -rf catalog_specs;
+	rm -rf application_specs;
 	rm -rf test_ebin;
 	#INFO: Deleting tilde files and beams
 	rm -rf *~ */*~ */*/*~;
@@ -47,7 +47,7 @@ clean:
 	rm -rf rebar.lock
 	#INFO: Deleting files and dirs created during execution/runtime 
 	rm -rf logs;
-	rm -rf catalog_specs;
+	rm -rf application_specs;
 	#INFO: clean ENDED SUCCESSFUL
 eunit: 
 	#INFO: eunit STARTED
@@ -70,7 +70,7 @@ eunit:
 	rm -rf rebar.lock
 	#INFO: Deleting files and dirs created during execution/runtime 
 	rm -rf logs;
-	rm -rf catalog_specs;
+	rm -rf application_specs;
 	#INFO: Creating eunit test code using test_ebin dir;
 	mkdir test_ebin;
 	cp test/test_rebar.config rebar.config;
@@ -86,8 +86,7 @@ eunit:
 	erl -pa test_ebin\
 	 -pa _build/default/lib/log/ebin\
 	 -pa _build/default/lib/rd/ebin\
-	 -pa _build/default/lib/compiler_server/ebin\
-	 -pa _build/default/lib/git_handler/ebin\
+	 -pa _build/default/lib/common/ebin\
 	 -pa _build/default/lib/application_server/ebin\
 	 -sname test_application_server\
 	 -run $(m) start\

@@ -21,7 +21,7 @@
 -define(AddTestApp,add_test).
 -define(AddTestFileName,"add_test.application").
 -define(AddTestRepoDir,"add_test" ).
--define(CatalogDir,"catalog_specs").
+-define(CatalogDir,"application_specs").
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
@@ -154,16 +154,5 @@ setup()->
     %% Application to test
     ok=application:start(application_server),
     pong=rpc:call(node(),application_server,ping,[],3*5000),  
- %   ok=initial_trade_resources(),
 
-    ok=file:make_dir(?CatalogDir),
-    os:cmd("cp test/add_test.application catalog_specs"),
-    ok.
-
-
-initial_trade_resources()->
-    [rd:add_local_resource(ResourceType,Resource)||{ResourceType,Resource}<-[]],
-    [rd:add_target_resource_type(TargetType)||TargetType<-[controller,adder3]],
-    rd:trade_resources(),
-    timer:sleep(3000),
     ok.

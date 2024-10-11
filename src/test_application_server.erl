@@ -16,7 +16,7 @@
 -define(AddTestApp,add_test).
 -define(AddTestFileName,"add_test.application").
 -define(AddTestRepoDir,"add_test" ).
--define(CatalogDir,"catalog_specs").
+-define(CatalogDir,"application_specs").
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------

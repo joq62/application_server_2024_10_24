@@ -318,6 +318,17 @@ handle_cast(UnMatchedSignal, State) ->
 	  {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info(timeout, State) ->
   
+    %% Check if application_specs are cloned/available
+    case lib_git:update_repo(?SpecsDir) of
+	{error,["Dir eexists ",_RepoDir]}->
+	    ok=lib_git:clone(?RepoGit);
+	{error,Reason}->
+	    ?LOG_WARNING("Failed to update ",[Reason]);
+	{ok,Info} ->
+	    ?LOG_NOTICE("Repo is created/updated ",[Info])
+    end,
+    
+
     ?LOG_NOTICE("Server started ",[?MODULE]),
     {noreply, State};
 
