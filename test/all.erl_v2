@@ -150,14 +150,17 @@ setup()->
     ok=log:create_logger(NodeNodeLogDir,?LocalLogDir,?LogFile,?MaxNumFiles,?MaxNumBytes),
 
     ok=application:start(rd),
-    
+
+    ok=application:start(compiler_server),
+    pong=rpc:call(node(),compiler_server,ping,[],3*5000),  
+    ok=application:start(git_handler),
+    pong=rpc:call(node(),git_handler,ping,[],3*5000),  
+
     %% Application to test
     ok=application:start(application_server),
     pong=rpc:call(node(),application_server,ping,[],3*5000),  
  %   ok=initial_trade_resources(),
-
-    ok=file:make_dir(?CatalogDir),
-    os:cmd("cp test/add_test.application catalog_specs"),
+    
     ok.
 
 

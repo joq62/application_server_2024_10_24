@@ -33,6 +33,61 @@
 %%--------------------------------------------------------------------
 start()->
      io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    {ok,Node}=test_start_node(),
+    ok=test_stop_node(Node),
+    ok=kvs_testing(),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+test_start_node()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    
+    {error,["Not started"]}=application_server:stop_node(?AddTestFileName),
+    {ok,Node}=application_server:start_node(?AddTestFileName),
+    pong=net_adm:ping(Node),
+    
+    {error,["Allready started"]}=application_server:start_node(?AddTestFileName),
+    
+ 
+    {ok,Node}.
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+test_stop_node(Node)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+     
+    ok=application_server:stop_node(?AddTestFileName),
+    {error,["Not started"]}=application_server:stop_node(?AddTestFileName),
+    pang=net_adm:ping(Node),
+    
+    
+    ok.
+
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+kvs_testing()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    
+    ok.
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% @end
+%%--------------------------------------------------------------------
+add_testing()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     %% Clean up
     application_server:stop_app(?AddTestFileName),
     application_server:unload_app(?AddTestFileName),

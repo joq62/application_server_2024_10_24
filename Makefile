@@ -5,6 +5,7 @@ all:
 	rm -rf erl_cra* rebar3_crashreport;
 	rm -rf *~ */*~ */*/*~ */*/*/*~;
 	#INFO: Deleting euinit test applications dirs
+	rm -rf *_container;
 	rm -rf logs;
 	rm -rf catalog_specs;
 	rm -rf test_ebin;
@@ -34,6 +35,8 @@ clean:
 	rm -rf erl_cra* rebar3_crashreport;
 	rm -rf *~ */*~ */*/*~ */*/*/*~;
 	#INFO: Deleting euinit test applications dirs
+	rm -rf *_container;
+	rm -rf logs;
 	rm -rf test_ebin;
 	#INFO: Deleting tilde files and beam
 	rm -rf src/*.beam;
@@ -54,6 +57,8 @@ eunit:
 	rm -rf erl_cra* rebar3_crashreport;
 	rm -rf *~ */*~ */*/*~ */*/*/*~;
 	#INFO: Deleting euinit test applications dirs
+	rm -rf *_container;
+	rm -rf logs;
 	rm -rf test_ebin;
 	#INFO: Deleting tilde files and beams
 	rm -rf src/*.beam;

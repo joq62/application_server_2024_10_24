@@ -1,0 +1,47 @@
+UniqueNum=integer_to_list(os:system_time(millisecond),36),
+VsnStr="010" , Vsn ="0.1.0"
+Application dir =UniqueNum_Applcation_VsnStr_container,
+NodeName=UniqueNum_Applcation_VsnStr
+
+Application deployment file used to define the application and status in deployment
+
+#{filename=>"add_test.application", 
+  application_info=>#{		    
+    	application_name=>"add_test", % used for ?
+  	vsn=>"0.1.0",			%  used fore ?
+  	app=>add_test, 		% ping
+  	giturl=>"https://github.com/joq62/add_test.git",
+  	build_dir=>"_build",
+  	libs=>"_build/default/lib",
+	apps_to_start=>[log,rd,add_test]
+	},
+  deployment_info=>#{
+	host=>"c50"
+		},
+  deployment_status=>#{
+	application_dir=>undefined,
+	nodename=>undefined,
+	node=>undefined,
+	status=>not_deployed,
+	created=>undefined
+	}
+}.
+
+
+1:N instances per application and Host
+
+Delete all directories with extension "container"
+delete_application_dirs()-> ok
+
+start_node(File)->{ok,Map}|{error,Reason},
+
+load(Map)-> {ok,Map2} |{error,Reason}
+start(Map)->{ok,Map2} |{error,Reason}
+stop(Map)->{ok,Map2} |{error,Reason}
+unload(Map)->{ok,Map2}
+
+stop_node(Map)->ok
+
+is_node_running(Map)-> true|false|{error,Reason}
+is_loaded(File)-> true|false
+is_started(File)->true|false

@@ -15,12 +15,6 @@
 -define(SleepInterval,20).
  
 %% API
-
--export([
-	 start_node/2,
-	 stop_node/2
-	]).
-
 -export([
 	 init/2,
 	 update/2,
@@ -28,7 +22,6 @@
 	]).
 
 -export([
-
 	 load_rel/2,
 	 start_rel/2,
 	 stop_rel/2,
@@ -42,74 +35,6 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% 
-%%   
-%%   
-%% @end
-%%--------------------------------------------------------------------
-start_node(SpecFile,ApplicationMaps)->
-    Result=case is_node_started(SpecFile,ApplicationMaps) of
-	       true->
-		   {error,["Allready started"]};
-	       false->
-		   {ok,[Map]}=file:consult(SpecFile),
-		   ApplicationInfoMap=maps:get(application_info,Map),
-		   DeploymentInfoMap=maps:get(deployment_info,Map),
-		   DeploymentStatusMap=maps:get(deployment_status,Map),
-		   {ok,Host}=net:gethostname(),
-		   %% Create dir
-		   UniqueNum=integer_to_list(os:system_time(millisecond),36),
-		   ApplName=maps:get(application_name,ApplicationInfoMap),
-		   Vsn=maps:get(vsn,ApplicationInfoMap), 
-		   [Major,Minor,Patch]=string:lexemes(Vsn,"."),
-		   ApplicationDir=UniqueNum++"_"++ApplName++"_"++Major++Minor++Patch++"_"++?DirExt,
-		   ok=file:make_dir(ApplicationDir),
-		   NodeName=UniqueNum++"_"++ApplName++"_"++Major++Minor++Patch,
-		   Node=list_to_atom(NodeName++"@"++Host),
-		   CookieStr=atom_to_list(erlang:get_cookie()),
-		   {ok,Node}=slave:start(Host,NodeName," -setcookie "++CookieStr),
-		   pong=net_adm:ping(Node),
-		   DeploymentStatusMap0=maps:update(application_dir,ApplicationDir,DeploymentStatusMap),
-		   DeploymentStatusMap1=maps:update(nodename,NodeName,DeploymentStatusMap0),
-		   DeploymentStatusMap2=maps:update(node,Node,DeploymentStatusMap1),
-		   DeploymentStatusMap3=maps:update(status,node_started,DeploymentStatusMap2),
-		   DeploymentStatusMap4=maps:update(created,{date(),time()},DeploymentStatusMap3),
-		   Map2=maps:update(deployment_status,DeploymentStatusMap4,Map),
-		   {ok,Node,[Map2|ApplicationMaps]}
-	   end,
-    Result.
-    
-    %%--------------------------------------------------------------------
-%% @doc
-%% 
-%%   
-%%   
-%% @end
-%%--------------------------------------------------------------------
-stop_node(SpecFile,ApplicationMaps)->
-    Result=case is_node_started(SpecFile,ApplicationMaps) of
-	       false->
-		   {error,["Not started"]};
-	       true->
-		   case get_application_map(SpecFile,ApplicationMaps) of
-		       undefined->
-			   {error,["Undefined"]};
-		       {ok,Map}->
-			   ApplicationInfoMap=maps:get(application_info,Map),
-			   DeploymentInfoMap=maps:get(deployment_info,Map),
-			   DeploymentStatusMap=maps:get(deployment_status,Map),
-
-			   Node=maps:get(node,DeploymentStatusMap),
-			   slave:stop(Node),
-			   ApplicationDir=maps:get(application_dir,DeploymentStatusMap), 
-			   file:del_dir_r(ApplicationDir),
-			   {ok,lists:delete(Map,ApplicationMaps)}
-		   end
-	   end,
-    Result.
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Data:
 %%   GitDir= git repo dir name where the files are cloned into.
 %%   Code ok:2024-09-17
@@ -118,7 +43,7 @@ stop_node(SpecFile,ApplicationMaps)->
 load_rel(CatalogDir,FileName)->
     Result=case is_rel_loaded(CatalogDir,FileName) of
 	       true->
-		   {error,["Allready loaded ",FileName]};
+		   {error,["Already loaded ",FileName]};
 	       false ->
 		   {ok,Cwd}=file:get_cwd(),
 		   case git_handler:read_file(CatalogDir,FileName) of
@@ -145,36 +70,6 @@ load_rel(CatalogDir,FileName)->
 	   end,
     Result.
 
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% 
-%% @end
-%%--------------------------------------------------------------------
-is_node_started(SpecFile,ApplicationMaps)->
-    case get_application_map(SpecFile,ApplicationMaps) of
-	undefined->
-	    false;
-	{ok,_Map}->
-	    true
-    end.
-    
-%%--------------------------------------------------------------------
-%% @doc
-%% 
-%% @end
-%%--------------------------------------------------------------------
-get_application_map(SpecFile,ApplicationMaps)->
-    Filename=filename:basename(SpecFile),
-    case [Map||Map<-ApplicationMaps,
-	       Filename=:=maps:get(filename,Map)] of
-	[]->
-	    undefined;
-	[Map] ->
-	    {ok,Map}
-    end.
-    
 %%--------------------------------------------------------------------
 %% @doc
 %% 

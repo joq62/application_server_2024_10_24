@@ -2,8 +2,10 @@
 %-define(MainDir,"catalog").
 
 -define(RepoGit,"https://github.com/joq62/catalog_specs.git").
--define(RepoDir,"catalog_specs").
--define(ApplicationDir,"application_dir").
+-define(SpecsDir,"catalog_specs").
 -define(Interval,20*1000).
 
+
+%
+-define(DirExt,"container").
 

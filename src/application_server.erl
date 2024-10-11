@@ -23,25 +23,14 @@
 %% API
 
 -export([
-	 
-	 load_app/1,
-	 start_app/1,
-	 stop_app/1,
-	 unload_app/1,
-	 is_app_loaded/1,
-	 is_app_started/1
-
+	 start_node/1,
+	 stop_node/1,
+	 load/1,
+	 start/1,
+	 stop/1,
+	 unload/1
 	 
 	]).
-
--export([
-
-	 all_filenames/0,
-	 check_update_repo/0,
-	 update/0
-	]).
-
-
 %% admin
 
 
@@ -62,9 +51,8 @@
 -define(SERVER, ?MODULE).
 		     
 -record(state, {
-		application_dir,
-		repo_dir,
-		git_path
+		specs_dir,
+		application_maps
 	        
 	       }).
 
@@ -75,107 +63,78 @@
 
 %%--------------------------------------------------------------------
 %% @doc
+%%  
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec start_node(Filename :: string()) -> 
+	  {ok,Node::node()} | {error,Reason::term()}.
+start_node(Filename) ->
+    gen_server:call(?SERVER,{start_node,Filename},infinity).
+
+%%--------------------------------------------------------------------
+%% @doc
+%%  
+%%  
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec stop_node(Filename :: string()) -> 
+	  ok | {error,Reason::term()}.
+stop_node(Filename) ->
+    gen_server:call(?SERVER,{stop_node,Filename},infinity).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec load(ApplicationMap::map()) -> 
+	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
+load(ApplicationMap) ->
+    gen_server:call(?SERVER,{load,ApplicationMap},infinity).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec start(ApplicationMap::map()) -> 
+	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
+start(ApplicationMap) ->
+    gen_server:call(?SERVER,{start,ApplicationMap},infinity).
+
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Based on info Application file git clone the repo and 
 %% extract the tar file  
 %% 
 %% @end
 %%--------------------------------------------------------------------
--spec load_app(Filename :: string()) -> 
-	  ok | {error,Reason::term()}.
-load_app(Filename) ->
-    gen_server:call(?SERVER,{load_app,Filename},infinity).
+-spec stop(ApplicationMap::map()) -> 
+	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
+stop(ApplicationMap) ->
+    gen_server:call(?SERVER,{stop,ApplicationMap},infinity).
+
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Based on info Application file starts the application. 
+%% Based on info Application file git clone the repo and 
+%% extract the tar file  
 %% 
 %% @end
 %%--------------------------------------------------------------------
--spec start_app(Filename :: string()) -> 
-	  ok | {error,Reason::term()}.
-start_app(Filename) ->
-    gen_server:call(?SERVER,{start_app,Filename},infinity).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Based on info Application file stops the application. 
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec stop_app(Filename :: string()) -> 
-	  ok | {error,Reason::term()}.
-stop_app(Filename) ->
-    gen_server:call(?SERVER,{stop_app,Filename},infinity).
-%%--------------------------------------------------------------------
-%% @doc
-%% Based on info Application file unload the application. 
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec unload_app(Filename :: string()) -> 
-	  ok | {error,Reason::term()}.
-unload_app(Filename) ->
-    gen_server:call(?SERVER,{unload_app,Filename},infinity).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Based on info Application file check if application is loaded. 
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec is_app_loaded(Filename :: string()) -> 
-	  IsLoaded::boolean()| {error,Reason::term()}.
-is_app_loaded(Filename) ->
-    gen_server:call(?SERVER,{is_app_loaded,Filename},infinity).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Based on info Application file check if application is started. 
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec is_app_started(Filename :: string()) -> 
-	  IsStarted::boolean()| {error,Reason::term()}.
-is_app_started(Filename) ->
-    gen_server:call(?SERVER,{is_app_started,Filename},infinity).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% This is the recurring function that checks if the repo needs to be 
-%% updated. If the repo 
-%%     - doesnt exists -> a git clone
-%%     - exists but behind main branch -> pull
-%%     - sync with main branch -> no action
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec check_update_repo() -> ok.
-
-check_update_repo() ->
-    gen_server:cast(?SERVER,{check_update_repo}).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Reads the filenames in the RepoDir   
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec all_filenames() -> 
-	  {ok,FileNames::term()} | {error,Reason :: term()}.
-
-all_filenames() ->
-    gen_server:call(?SERVER,{all_filenames},infinity).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% 
-%% @end
-%%--------------------------------------------------------------------
--spec update() -> ok | Error::term().
-update()-> 
-    gen_server:call(?SERVER, {update},infinity).
-
+-spec unload(ApplicationMap::map()) -> 
+	  {ok,ApplicationMap2::map()} | {error,Reason::term()}.
+unload(ApplicationMap) ->
+    gen_server:call(?SERVER,{unload,ApplicationMap},infinity).
 
 
 %%--------------------------------------------------------------------
@@ -232,8 +191,8 @@ stop()-> gen_server:stop(?SERVER).
 init([]) ->
     
     {ok, #state{
-	    repo_dir=?RepoDir,
-	    git_path=?RepoGit
+	    specs_dir=?SpecsDir,
+	    application_maps=[]
 	    
 	   },0}.
 
@@ -254,183 +213,31 @@ init([]) ->
 	  {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
 	  {stop, Reason :: term(), NewState :: term()}.
 
+handle_call({start_node,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:start_node(SpecFile,State#state.application_maps) of
+	      {ok,Node,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  {ok,Node};
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
 
-handle_call({load_app,Filename}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try lib_application:load_rel(RepoDir,Filename) of
- %   Result=try lib_application:load_app(RepoDir,Filename) of
-	       ok->
-		   ok;
-	       Error->
-		   Error
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      ok->
+
+handle_call({stop_node,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:stop_node(SpecFile,State#state.application_maps) of
+	      {ok,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
 		  ok;
-	      ErrorEvent->
-		  ErrorEvent
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
 	  end,
-    {reply, Reply,State};
+    {reply, Reply,NewState};
 
-handle_call({start_app,Filename}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try lib_application:start_rel(RepoDir,Filename) of
- %   Result=try lib_application:start_app(RepoDir,Filename) of
-	       ok->
-		   ok;
-	       Error->
-		   Error
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      ok->
-		  ok;
-	      ErrorEvent->
-		  ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-handle_call({stop_app,Filename}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try lib_application:stop_rel(RepoDir,Filename) of
-	      ok->
-		   ok;
-	       Error->
-		   Error
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      ok->
-		  ok;
-	      ErrorEvent->
-		  ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-handle_call({unload_app,Filename}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try lib_application:unload_rel(RepoDir,Filename) of
-	       ok->
-		   ok;
-	       Error->
-		   Error
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      ok ->
-		  ok;
-	      ErrorEvent->
-		  ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-handle_call({is_app_loaded,Filename}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try lib_application:is_rel_loaded(RepoDir,Filename) of
-	       true->
-		   true;
-	       false->
-		   false
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      true->
-		  true;
-	      false->
-		  false;
-	      ErrorEvent->
-		  ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-handle_call({is_app_started,Filename}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try lib_application:is_rel_started(RepoDir,Filename) of
-	       true->
-		   true;
-	       false->
-		   false
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      true->
-		  true;
-	      false->
-		  false;
-	      ErrorEvent->
-		  ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-
-handle_call({all_filenames}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try git_handler:all_filenames(RepoDir) of
-	       {ok,R}->
-		    {ok,R};
-	       Error->
-		   Error
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      {ok,AllFileNames}->
-		  {ok,AllFileNames};
-	      ErrorEvent->
-		% io:format("ErrorEvent ~p~n",[{ErrorEvent,?MODULE,?LINE}]),
-		  ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-handle_call({read_file,FileName}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    Result=try git_handler:read_file(RepoDir,FileName) of
-	       {ok,R}->
-		    {ok,R};
-	       Error->
-		   Error
-	   catch
-	       Event:Reason:Stacktrace ->
-		   {Event,Reason,Stacktrace,?MODULE,?LINE}
-	   end,
-    Reply=case Result of
-	      {ok,Info}->
-		  {ok,Info};
-	      ErrorEvent->
-		 ErrorEvent
-	  end,
-    {reply, Reply,State};
-
-handle_call({update}, _From, State) ->
-    RepoDir=State#state.repo_dir,
-    GitPath=State#state.git_path,    
-    Reply=lib_application:update(RepoDir,GitPath),
-    {reply, Reply, State};
-
-
-handle_call({update_repo_dir,RepoDir}, _From, State) ->
-    NewState=State#state{repo_dir=RepoDir},
-    Reply=ok,
-    {reply, Reply, NewState};
-
-handle_call({update_git_path,GitPath}, _From, State) ->
-    NewState=State#state{git_path=GitPath},
-    Reply=ok,
-    {reply, Reply, NewState};
 
 
 %%--------------------------------------------------------------------
@@ -455,25 +262,6 @@ handle_call(UnMatchedSignal, From, State) ->
 %%--------------------------------------------------------------------
 
 
-handle_cast({check_update_repo}, State) ->
-    RepoDir=State#state.repo_dir,
-    GitPath=State#state.git_path,    
-    try lib_application:update(RepoDir,GitPath) of
-	{ok,"Cloned the repo"}->
-	    ?LOG_NOTICE("Cloned the repo",[]);
-	{ok,"Pulled a new update of the repo"}->
-	    ?LOG_NOTICE("Pulled a new update of the repo",[]);
-	{ok,"Repo is up to date"}->
-	    ok
-    catch
-	Event:Reason:Stacktrace ->
-	    {Event,Reason,Stacktrace,?MODULE,?LINE}
-    end,
-    spawn(fun()->lib_application:timer_to_call_update(?Interval) end),
-    {noreply, State};
-
-
-
 handle_cast({stop}, State) ->
     
     {stop,normal,ok,State};
@@ -495,20 +283,7 @@ handle_cast(UnMatchedSignal, State) ->
 	  {noreply, NewState :: term(), hibernate} |
 	  {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info(timeout, State) ->
-    RepoDir=State#state.repo_dir,
-    GitPath=State#state.git_path,
-   try lib_application:init(RepoDir,GitPath) of
-       ok->
-	   ok;
-       {error,Reason}->
-	   ?LOG_WARNING("Init failed",[Reason]),
-	   {error,Reason}
-   catch
-       Event:Reason:Stacktrace ->
-	   ?LOG_WARNING("Init failed",[Event,Reason,Stacktrace]),
-	   {Event,Reason,Stacktrace,?MODULE,?LINE}
-   end,
-    spawn(fun()->lib_application:timer_to_call_update(?Interval) end),
+  
     ?LOG_NOTICE("Server started ",[?MODULE]),
     {noreply, State};
 
