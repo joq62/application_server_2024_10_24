@@ -17,12 +17,15 @@
 %% API
 
 -export([
+	 get_wanted_applications/1,	 
+	 get_active_applications/1,
+
 	 start_node/2,
 	 stop_node/2,
 	 load/2,
 	 unload/2,
-	 start/2
-%	 stop/2
+	 start/2,
+	 stop/2
 	]).
 
 -export([
@@ -44,6 +47,41 @@
 
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+get_wanted_applications(SpecDir)->
+    {ok,Files}=file:list_dir(SpecDir),
+    FilesPath=[filename:join(SpecDir,SpecFile)||SpecFile<-Files],
+    L1=[{filename:basename(SpecFile),file:consult(SpecFile)}||SpecFile<-FilesPath],
+    {ok,Host}=net:gethostname(), 
+    WantedFiles=[File||{File,{ok,[Map]}}<-L1,
+	   Host=:=maps:get(host,Map)],
+    {ok,WantedFiles}.	     
+    
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+get_active_applications(ApplicationMaps)->
+
+    File_Nodes_Apps=[{maps:get(filename,Map),maps:get(node,Map),maps:get(app,Map)}||Map<-ApplicationMaps,
+							started=:=maps:get(status,Map)],
+    Active=[File||{File,Node,App}<-File_Nodes_Apps,
+		  pong=:=net_adm:ping(Node),
+		  pong=:=rpc:call(Node,App,ping,[],5000)],
+    {ok,Active}.     
+    
+    
+    
 %%--------------------------------------------------------------------
 %% @doc
 %% 
@@ -79,6 +117,35 @@ start(SpecFile,ApplicationMaps)->
 			    {ok,[Map1|lists:delete(Map,ApplicationMaps)]};
 			Error->
 			    {error,["Failed to start ",SpecFile,Error]}
+		    end
+	    end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% 
+%%   
+%%   
+%% @end
+%%--------------------------------------------------------------------
+stop(SpecFile,ApplicationMaps)->
+    case get_application_map(SpecFile,ApplicationMaps) of
+	undefined->
+	    {error,["Node not started"]};
+	{ok,Map}->
+	    case is_loaded(Map) of
+		false->
+		    {error,["Not loaded",SpecFile]};
+		true->
+		    Node=maps:get(node,Map),
+		    ApplicationsToStart=maps:get(apps_to_start,Map), 
+		    StopResult=[{App,rpc:call(Node,application,stop,[App],5000)}||App<-ApplicationsToStart],
+		    case [{App,R}||{App,R}<-StopResult,ok=/=R] of
+			[]->
+			    Map1=maps:update(status,started,Map),
+			    {ok,[Map1|lists:delete(Map,ApplicationMaps)]};
+			Error->
+			    {error,["Failed to stop ",SpecFile,Error]}
 		    end
 	    end
     end.

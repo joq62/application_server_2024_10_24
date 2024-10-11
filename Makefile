@@ -6,6 +6,7 @@ all:
 	rm -rf *~ */*~ */*/*~ */*/*/*~;
 	#INFO: Deleting euinit test applications dirs
 	rm -rf *_container;
+	rm -rf Mnesia.*;
 	rm -rf logs;
 	rm -rf application_specs;
 	rm -rf test_ebin;
@@ -36,6 +37,7 @@ clean:
 	rm -rf *~ */*~ */*/*~ */*/*/*~;
 	#INFO: Deleting euinit test applications dirs
 	rm -rf *_container;
+	rm -rf Mnesia.*;
 	rm -rf logs;
 	rm -rf test_ebin;
 	#INFO: Deleting tilde files and beam
@@ -58,6 +60,7 @@ eunit:
 	rm -rf *~ */*~ */*/*~ */*/*/*~;
 	#INFO: Deleting euinit test applications dirs
 	rm -rf *_container;
+	rm -rf Mnesia.*;
 	rm -rf logs;
 	rm -rf test_ebin;
 	#INFO: Deleting tilde files and beams

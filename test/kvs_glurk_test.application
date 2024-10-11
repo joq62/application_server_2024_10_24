@@ -1,0 +1,20 @@
+#{filename=>"kvs_glurk_test.application",
+  %% application_info
+    	application_name=>"kvs_test", % used for ?
+  	vsn=>"0.1.0",			%  used fore ?
+  	app=>kvs_test, 		% ping
+  	giturl=>"https://github.com/joq62/kvs_test.git",
+  	build_dir=>"_build",
+  	libs=>"_build/default/lib",
+	apps_to_start=>[log,rd,mnesia,kvs_test],
+  %% deployment_info
+	host=>"c50",
+	
+  % deployment_status
+	application_dir=>undefined,
+	nodename=>undefined,
+	node=>undefined,
+	status=>not_deployed,
+	created=>undefined
+	
+}.

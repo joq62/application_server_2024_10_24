@@ -23,6 +23,14 @@
 %% API
 
 -export([
+	
+	 get_wanted_applications/0,
+	 get_active_applications/0
+	 
+	]).
+
+
+-export([
 	 start_node/1,
 	 stop_node/1,
 	 load/1,
@@ -59,6 +67,32 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%%  
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec get_wanted_applications() -> 
+	  {ok,ListOfApplicationSpecs::term()} | {error,Reason::term()}.
+get_wanted_applications()  ->
+    gen_server:call(?SERVER,{get_wanted_applications},infinity).
+
+%%--------------------------------------------------------------------
+%% @doc
+%%  
+%% 
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-spec get_active_applications() -> 
+	  {ok,ListOfApplicationSpecs::term()} | {error,Reason::term()}.
+get_active_applications()  ->
+    gen_server:call(?SERVER,{get_active_applications},infinity).
+
 
 
 %%--------------------------------------------------------------------
@@ -211,6 +245,25 @@ init([]) ->
 	  {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
 	  {stop, Reason :: term(), NewState :: term()}.
 
+handle_call({get_wanted_applications}, _From, State) ->
+    Reply=case lib_application:get_wanted_applications(State#state.specs_dir) of
+	      {ok,ApplcationSpecFiles}->
+		  {ok,ApplcationSpecFiles};
+	      {error,Reason}->
+		  {error,Reason}
+	  end,
+    {reply, Reply,State};
+
+handle_call({get_active_applications}, _From, State) ->
+    Reply=case lib_application:get_active_applications(State#state.application_maps) of
+	      {ok,ApplcationSpecFiles}->
+		  {ok,ApplcationSpecFiles};
+	      {error,Reason}->
+		  {error,Reason}
+	  end,
+    {reply, Reply,State};
+
+
 handle_call({start_node,Filename}, _From, State) ->
     SpecFile=filename:join(State#state.specs_dir,Filename),
     Reply=case lib_application:start_node(SpecFile,State#state.application_maps) of
@@ -251,6 +304,18 @@ handle_call({load,Filename}, _From, State) ->
 handle_call({start,Filename}, _From, State) ->
     SpecFile=filename:join(State#state.specs_dir,Filename),
     Reply=case lib_application:start(SpecFile,State#state.application_maps) of
+	      {ok,NewApplcationMaps}->
+		  NewState=State#state{application_maps=NewApplcationMaps},
+		  ok;
+	      {error,Reason}->
+		  NewState=State,
+		  {error,Reason}
+	  end,
+    {reply, Reply,NewState};
+
+handle_call({stop,Filename}, _From, State) ->
+    SpecFile=filename:join(State#state.specs_dir,Filename),
+    Reply=case lib_application:stop(SpecFile,State#state.application_maps) of
 	      {ok,NewApplcationMaps}->
 		  NewState=State#state{application_maps=NewApplcationMaps},
 		  ok;
