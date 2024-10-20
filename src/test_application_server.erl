@@ -33,16 +33,23 @@
 %%--------------------------------------------------------------------
 start()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    {ok,Node}=test_start_node(),
-    ok=test_load(),
-    ok=test_start(Node),
-    ok=test_stop(Node),
-    ok=test_unload(),
-    ok=test_stop_node(Node),
+%    {ok,Node}=test_start_node(),
+%    ok=test_load(),
+%    ok=test_start(Node),
+%    ok=test_stop(Node),
+%    ok=test_unload(),
+%    ok=test_stop_node(Node),
 
-    ok=test_intent(),
+%    ok=test_intent(),
 
+    loop(),
     ok.
+
+
+loop()->
+    timer:sleep(20*1000),
+    loop().
+
 %%--------------------------------------------------------------------
 %% @doc
 %% 
@@ -59,8 +66,8 @@ test_intent()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     {ok,WantedApplicationFiles}=application_server:get_wanted_applications(),
     {ok,[]}=application_server:get_active_applications(),
-    FilesToStart1=application_server:applications_to_start(),
-    [File1|_]=FilesToStart1,
+    FilesToStart=application_server:applications_to_start(),
+    [File1|_]=FilesToStart,
     StartResult1=application_server:load_start(File1),
     io:format("StartResult1 ~p~n",[StartResult1]),    
     {ok,["add_test.application"]}=application_server:get_active_applications(),

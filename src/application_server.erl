@@ -267,6 +267,8 @@ stop()-> gen_server:stop(?SERVER).
 
 init([]) ->
     
+    Self=self(),
+    spawn_link(fun()->repo_check_timeout_loop(Self) end),
     {ok, #state{
 	    specs_dir=?SpecsDir,
 	    application_maps=[]
@@ -467,19 +469,42 @@ handle_cast(UnMatchedSignal, State) ->
 	  {noreply, NewState :: term(), hibernate} |
 	  {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info(timeout, State) ->
-  
-    %% Check if application_specs are cloned/available
     case lib_git:update_repo(?SpecsDir) of
 	{error,["Dir eexists ",_RepoDir]}->
-	    ok=lib_git:clone(?RepoGit);
+	    ok=case lib_git:clone(?RepoGit) of
+		   ok->
+		       ?LOG_NOTICE("Repo dir didnt existed so a succesful cloned action is executed",[?SpecsDir]);
+		   {error,Reason}->
+		       ?LOG_WARNING("Failed during clone action ",[Reason])
+	       end;
+	{error,["Already updated ","application_specs"]}->
+	    ok;
 	{error,Reason}->
 	    ?LOG_WARNING("Failed to update ",[Reason]);
 	{ok,Info} ->
-	    ?LOG_NOTICE("Repo is created/updated ",[Info])
+	    ?LOG_NOTICE("Repo dir actions",[Info,?SpecsDir]),
+	    ok
     end,
-    
-
     ?LOG_NOTICE("Server started ",[?MODULE]),
+    {noreply, State};
+
+handle_info({timeout,check_repo_update}, State) ->
+    case lib_git:update_repo(?SpecsDir) of
+	{error,["Dir eexists ",_RepoDir]}->
+	    ok=case lib_git:clone(?RepoGit) of
+		   ok->
+		       ?LOG_NOTICE("Repo dir didnt existed so a succesful cloned action is executed",[?SpecsDir]);
+		   {error,Reason}->
+		       ?LOG_WARNING("Failed during clone action ",[Reason])
+	       end;
+	{error,["Already updated ","application_specs"]}->
+	    ok;
+	{error,Reason}->
+	    ?LOG_WARNING("Failed to update ",[Reason]);
+	{ok,Info} ->
+	    ?LOG_NOTICE("Repo dir actions",[Info,?SpecsDir]),
+	    ok
+    end,
     {noreply, State};
 
 
@@ -531,3 +556,8 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+repo_check_timeout_loop(Parent)->
+    timer:sleep(?CheckRepoInterval),
+    Parent!{timeout,check_repo_update},
+    repo_check_timeout_loop(Parent).
