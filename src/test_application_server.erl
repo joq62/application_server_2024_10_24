@@ -33,14 +33,13 @@
 %%--------------------------------------------------------------------
 start()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-%    {ok,Node}=test_start_node(),
-%    ok=test_load(),
-%    ok=test_start(Node),
-%    ok=test_stop(Node),
-%    ok=test_unload(),
-%    ok=test_stop_node(Node),
-
-%    ok=test_intent(),
+    {ok,Node}=test_start_node(),
+    ok=test_load(),
+    ok=test_start(Node),
+    ok=test_stop(Node),
+    ok=test_unload(),
+    ok=test_stop_node(Node),
+    ok=test_intent(),
 
     loop(),
     ok.
