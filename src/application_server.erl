@@ -474,8 +474,8 @@ handle_info(timeout, State) ->
     [{Dir,file:del_dir_r(Dir)}||Dir<-ApplicationDirs],
     MnesiaDirs=lib_application:get_mnesia_dirs(Files),
     [{Dir,file:del_dir_r(Dir)}||Dir<-MnesiaDirs],
-   
 
+    file:del_dir_r(?SpecsDir),
     case lib_git:update_repo(?SpecsDir) of
 	{error,["Dir eexists ",_RepoDir]}->
 	    ok=case lib_git:clone(?RepoGit) of
