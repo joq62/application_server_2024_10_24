@@ -15,6 +15,10 @@
 %% API
 
 -export([
+	 
+	 get_application_dirs/1,
+	  get_mnesia_dirs/1,
+
 	 load_start/2,
 	 stop_unload/2,
 	 get_wanted_applications/1,	 
@@ -39,6 +43,32 @@
 	
 
 	]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+get_application_dirs(Files)->
+    [File||File<-Files,
+	   filelib:is_dir(File),
+	   "container"=:=lists:last(string:lexemes(File,"_"))].
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+get_mnesia_dirs(Files)->
+    [File||File<-Files,
+	   filelib:is_dir(File),
+	   "Mnesia"=:=lists:nth(1,string:lexemes(File,"."))].
+
+    
+    
+
+
 
 %%--------------------------------------------------------------------
 %% @doc

@@ -467,6 +467,15 @@ handle_cast(UnMatchedSignal, State) ->
 	  {noreply, NewState :: term(), hibernate} |
 	  {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info(timeout, State) ->
+
+    %%Clean up application dirs and Mnesia dirs
+    {ok,Files}=file:list_dir("."),
+    ApplicationDirs=lib_application:get_application_dirs(Files),
+    [{Dir,file:del_dir_r(Dir)}||Dir<-ApplicationDirs],
+    MnesiaDirs=lib_application:get_mnesia_dirs(Files),
+    [{Dir,file:del_dir_r(Dir)}||Dir<-MnesiaDirs],
+   
+
     case lib_git:update_repo(?SpecsDir) of
 	{error,["Dir eexists ",_RepoDir]}->
 	    ok=case lib_git:clone(?RepoGit) of
