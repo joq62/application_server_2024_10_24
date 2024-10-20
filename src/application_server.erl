@@ -267,8 +267,6 @@ stop()-> gen_server:stop(?SERVER).
 
 init([]) ->
     
-    Self=self(),
-    spawn_link(fun()->repo_check_timeout_loop(Self) end),
     {ok, #state{
 	    specs_dir=?SpecsDir,
 	    application_maps=[]
@@ -484,7 +482,9 @@ handle_info(timeout, State) ->
 	{ok,Info} ->
 	    ?LOG_NOTICE("Repo dir actions",[Info,?SpecsDir]),
 	    ok
-    end,
+    end,    
+    Self=self(),
+    spawn_link(fun()->repo_check_timeout_loop(Self) end),
     ?LOG_NOTICE("Server started ",[?MODULE]),
     {noreply, State};
 
