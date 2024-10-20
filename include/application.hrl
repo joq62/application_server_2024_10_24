@@ -7,5 +7,6 @@
 
 
 %
+-define(FileExt,".application").
 -define(DirExt,"container").
 

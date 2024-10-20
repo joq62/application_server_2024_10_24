@@ -74,7 +74,9 @@ stop_unload(SpecFile,ApplicationMaps)->
 get_wanted_applications(SpecDir)->
     {ok,Files}=file:list_dir(SpecDir),
     FilesPath=[filename:join(SpecDir,SpecFile)||SpecFile<-Files],
-    L1=[{filename:basename(SpecFile),file:consult(SpecFile)}||SpecFile<-FilesPath],
+    L1=[{filename:basename(SpecFile),file:consult(SpecFile)}||SpecFile<-FilesPath,
+							      ?FileExt=:=filename:extension(SpecFile)],
+    L2=
     {ok,Host}=net:gethostname(), 
     WantedFiles=[File||{File,{ok,[Map]}}<-L1,
 	   Host=:=maps:get(host,Map)],
