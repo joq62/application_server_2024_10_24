@@ -236,7 +236,8 @@ load(SpecFile,ApplicationMaps)->
 		    %%Compile
 		    {ok,Root}=file:get_cwd(),
 		    ok=file:set_cwd(ApplicationDir),
-		    os:cmd("rebar3 compile"),  
+		    Rebar3CompileResult=os:cmd("rebar3 compile"),  
+		    ?LOG_NOTICE("rebar3 compile result",[Rebar3CompileResult,SpecFile]),
 		    ok=file:set_cwd(Root),
 		    case is_loaded(Map) of
 			false->
