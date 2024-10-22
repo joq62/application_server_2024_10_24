@@ -28,6 +28,9 @@ all:
 	git status
 	echo Ok there you go!
 	#INFO: no_ebin_commit ENDED SUCCESSFUL
+target:
+	git clone $(git) $(appdir)
+	cd $(appdir) && rebar3 compile
 clean:
 	#INFO: clean STARTED
 	#INFO: with_ebin_commit STARTED
