@@ -250,7 +250,7 @@ load(SpecFile,ApplicationMaps)->
 		    case is_loaded(Map) of
 			false->
 			    %% Clean up 
-			    file:del_dir_r(ApplicationDir),
+			%    file:del_dir_r(ApplicationDir),
 			    Node=maps:get(node,Map),
 			    rpc:call(node(),slave,stop,[Node],5000),
 			    {error,["Failed to compile",SpecFile]};
