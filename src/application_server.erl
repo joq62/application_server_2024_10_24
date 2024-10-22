@@ -301,7 +301,7 @@ handle_call({load_start,Filename}, _From, State) ->
 	   catch
 	       Event:Reason:Stacktrace ->
 		   {error,[#{event=>Event,
-			     redule=>?MODULE,
+			     module=>?MODULE,
 			     function=>?FUNCTION_NAME,
 			     line=>?LINE,
 			     args=>[Filename],

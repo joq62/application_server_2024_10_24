@@ -232,13 +232,17 @@ load(SpecFile,ApplicationMaps)->
 		     %%Clone
 		    ApplicationDir=maps:get(application_dir,Map),
 		    GitUrl=maps:get(giturl,Map),    
-		    os:cmd("git clone "++GitUrl++" "++ApplicationDir),
+		    CloneResult=os:cmd("git clone "++GitUrl++" "++ApplicationDir),
+		    ?LOG_NOTICE("CloneResult result",[CloneResult,ApplicationDir,SpecFile]),
 		    %%Compile
 		    {ok,Root}=file:get_cwd(),
+		    ?LOG_NOTICE("DBG: RootDirt",[Root]),
 		    ok=file:set_cwd(ApplicationDir),
+		    ?LOG_NOTICE("DBG: Pwd applicationdir ",[file:get_cwd()]),
 		    Rebar3CompileResult=os:cmd("rebar3 compile"),  
 		    ?LOG_NOTICE("rebar3 compile result",[Rebar3CompileResult,SpecFile]),
 		    ok=file:set_cwd(Root),
+		    ?LOG_NOTICE("DBG: Should bee Root dir  ",[file:get_cwd()]),
 		    case is_loaded(Map) of
 			false->
 			    %% Clean up 
