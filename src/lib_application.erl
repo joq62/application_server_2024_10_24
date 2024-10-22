@@ -230,8 +230,10 @@ load(SpecFile,ApplicationMaps)->
 		    {error,["Allready loaded",SpecFile]};
 		false->
 		     %%Clone
+		    ?LOG_NOTICE("UserOrRoot",[os:cmd("whoami ")]),
 		    ApplicationDir=maps:get(application_dir,Map),
-		    GitUrl=maps:get(giturl,Map),    
+		    GitUrl=maps:get(giturl,Map),
+		    Node=maps:get(node,Map),    
 	%	    CloneResult=os:cmd("git clone "++GitUrl++" "++ApplicationDir),
 	%	    ?LOG_NOTICE("CloneResult result",[CloneResult,ApplicationDir,SpecFile]),
 		    %%Compile
@@ -251,7 +253,7 @@ load(SpecFile,ApplicationMaps)->
 			false->
 			    %% Clean up 
 			%    file:del_dir_r(ApplicationDir),
-			    Node=maps:get(node,Map),
+			 
 			    rpc:call(node(),slave,stop,[Node],5000),
 			    {error,["Failed to compile",SpecFile]};
 			true ->
