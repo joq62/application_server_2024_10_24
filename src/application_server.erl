@@ -293,13 +293,27 @@ init([]) ->
 
 handle_call({load_start,Filename}, _From, State) ->
     SpecFile=filename:join(State#state.specs_dir,Filename),
-    Reply=case lib_application:load_start(SpecFile,State#state.application_maps) of
-	      {ok,Node,NewApplcationMaps}->
-		  NewState=State#state{application_maps=NewApplcationMaps},
+    Result=try lib_application:load_start(SpecFile,State#state.application_maps) of
+	      {ok,R1,R2}->
+		   {ok,R1,R2};
+	      {error,ErrorR}->
+		   {error,["M:F [A]) with reason",lib_application,load_start,[Filename],"Reason=", ErrorR]}
+	   catch
+	       Event:Reason:Stacktrace ->
+		   {error,[#{event=>Event,
+			     redule=>?MODULE,
+			     function=>?FUNCTION_NAME,
+			     line=>?LINE,
+			     args=>[Filename],
+			     stacktrace=>[Stacktrace]}]}
+	   end,
+    Reply=case Result of
+	      {ok,Node,NewApplicationMaps}->
+		  NewState=State#state{application_maps=NewApplicationMaps},
 		  {ok,Node};
-	      {error,Reason}->
+	      {error,ErrorReason}->
 		  NewState=State,
-		  {error,Reason}
+		  {error,ErrorReason}
 	  end,
     {reply, Reply,NewState};
 
